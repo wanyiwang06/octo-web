@@ -241,6 +241,26 @@ export interface CreateSummaryParams {
     origin_channel_type?: number;
 }
 
+/**
+ * Agent 总结创建请求。
+ *
+ * 区别于普通 createSummary：普通总结按固定主题/模板汇总聊天内容，
+ * Agent 总结让后端 agent 根据用户输入的自然语言「需求」自主规划并生成总结。
+ *
+ * NOTE(预留)：后端接口尚未就绪。字段以「需求 requirement」为核心，其余
+ * sources / origin_channel_* 与 CreateSummaryParams 对齐，便于后端复用同一套
+ * 来源解析。后端接口定稿后按实际契约调整此类型与 summaryApi.createAgentSummary。
+ */
+export interface CreateAgentSummaryParams {
+    /** 用户输入的自然语言总结需求（复用弹窗内的主题输入框内容） */
+    requirement: string;
+    title?: string;
+    time_range?: TimeRange;
+    sources?: SourceItem[];
+    origin_channel_id?: string;
+    origin_channel_type?: number;
+}
+
 /** 列表查询参数 */
 export interface ListSummariesParams {
     page?: number;

@@ -23,11 +23,31 @@ vi.mock('@douyinfe/semi-ui', () => ({
             {icon}{children}
         </button>
     ),
+    SplitButtonGroup: ({ children, className }: any) => (
+        <div data-testid="split-button-group" className={className}>{children}</div>
+    ),
+    Dropdown: Object.assign(
+        ({ children, render }: any) => (
+            <div data-testid="dropdown">
+                {children}
+                <div data-testid="dropdown-menu">{render}</div>
+            </div>
+        ),
+        {
+            Menu: ({ children }: any) => <div data-testid="dropdown-menu-list">{children}</div>,
+            Item: ({ children, onClick, active }: any) => (
+                <button data-testid="dropdown-item" data-active={active} onClick={onClick}>
+                    {children}
+                </button>
+            ),
+        },
+    ),
 }));
 
 vi.mock('@douyinfe/semi-icons', () => ({
     IconPlus: () => <span data-testid="icon-plus" />,
     IconClock: () => <span data-testid="icon-clock" />,
+    IconChevronDown: () => <span data-testid="icon-chevron-down" />,
 }));
 
 vi.mock('@octo/base', async () => {

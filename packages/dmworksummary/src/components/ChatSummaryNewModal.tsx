@@ -1,10 +1,10 @@
 import React, { Component, createRef } from 'react';
-import { Modal, Toast, Tag, Button } from '@douyinfe/semi-ui';
-import { IconPlus, IconClock } from '@douyinfe/semi-icons';
+import { Modal, Toast, Tag, Button, Dropdown, SplitButtonGroup } from '@douyinfe/semi-ui';
+import { IconPlus, IconClock, IconChevronDown } from '@douyinfe/semi-icons';
 import { WKApp, I18nContext } from '@octo/base';
 import VoiceInputButton from '@octo/base/src/Components/VoiceInputButton';
 import type { ReplaceMode, SelectionRange } from '@octo/base/src/Components/VoiceInputButton';
-import type { TopicTemplate, ChatCandidate, ScheduleConfig } from '../types/summary';
+import type { TopicTemplate, ChatCandidate, ScheduleConfig, CreateAgentSummaryParams } from '../types/summary';
 import { SourceType, SummaryMode } from '../types/summary';
 import { getSourceType } from '../utils/channelType';
 import { channelToChatCandidate } from '../utils/channelConvert';
@@ -31,10 +31,12 @@ interface ChatSummaryNewModalState {
     topic: string;
     appliedTemplateLabel: string;
     customTemplateLimit: number;
+    mode: 'normal' | 'agent';
     templates: ResolvableTemplate[];
     selectedChats: ChatCandidate[];
     showChatSelector: boolean;
     submitting: boolean;
+    agentSubmitting: boolean;
     templatePlaceholderRange: [number, number] | null;
     scheduleConfig: ScheduleConfig | null;
     showScheduleConfig: boolean;
@@ -84,10 +86,12 @@ export default class ChatSummaryNewModal extends Component<
             topic: '',
             appliedTemplateLabel: '',
             customTemplateLimit: 30,
+            mode: 'normal',
             templates: TOPIC_TEMPLATES,
             selectedChats: [],
             showChatSelector: false,
             submitting: false,
+            agentSubmitting: false,
             templatePlaceholderRange: null,
             scheduleConfig: null,
             showScheduleConfig: false,
@@ -115,9 +119,11 @@ export default class ChatSummaryNewModal extends Component<
                 topic: '',
                 appliedTemplateLabel: '',
                 customTemplateLimit: 30,
+                mode: 'normal',
                 selectedChats: [defaultChat],
                 showChatSelector: false,
                 submitting: false,
+                agentSubmitting: false,
                 templatePlaceholderRange: null,
                 scheduleConfig: null,
                 showScheduleConfig: false,
@@ -412,6 +418,80 @@ export default class ChatSummaryNewModal extends Component<
         }
     };
 
+    /**
+     * Agent 总结提交（预留接口）。
+     *
+     * 与 handleSubmit 的区别：把用户输入作为自然语言「需求 requirement」交给后端
+     * agent 自主规划总结，而非按主题/模板汇总。来源（sources）组装逻辑与 handleSubmit
+     * 保持一致，复用当前弹窗已选聊天 / 默认频道。
+     *
+     * NOTE(预留)：后端 '/summaries/agent' 尚未实现，调用会抛错并 Toast 提示；
+     * 后端就绪后仅需改 summaryApi.createAgentSummary 的 path，本方法无需变更。
+     */
+    private handleAgentSubmit = async () => {
+        const { topic, selectedChats } = this.state;
+        const { channel, onSubmit } = this.props;
+
+        if (!topic.trim()) return;
+
+        const sourceType = getSourceType(channel);
+        if (sourceType === null) return;
+
+        this.setState({ agentSubmitting: true });
+        try {
+            const sources = selectedChats.length > 0
+                ? selectedChats.map((c) => ({
+                    source_type: (c.chat_type === 'group'
+                        ? SourceType.GROUP_CHAT
+                        : c.chat_type === 'thread'
+                        ? SourceType.THREAD
+                        : SourceType.DIRECT_MESSAGE),
+                    source_id: c.chat_id,
+                }))
+                : [{
+                    source_type: sourceType as 1 | 2 | 3,
+                    source_id: channel.channelID,
+                }];
+
+            const params: CreateAgentSummaryParams = {
+                requirement: topic.trim(),
+                origin_channel_id: channel.channelID,
+                origin_channel_type: sourceType,
+                sources,
+            };
+
+            const res = await summaryApi.createAgentSummary(params);
+
+            window.dispatchEvent(
+                new CustomEvent('chat-summary-created', {
+                    detail: { taskId: res.task_id, channelId: channel.channelID },
+                }),
+            );
+            onSubmit(res.task_id);
+        } catch (err: unknown) {
+            const msg = err instanceof Error
+                ? err.message
+                : this.context.t('summary.common.createFailedRetry');
+            Toast.error(msg);
+        } finally {
+            this.setState({ agentSubmitting: false });
+        }
+    };
+
+    /** 主按钮点击：按当前 mode 分发到普通总结 / Agent 总结。 */
+    private handlePrimaryClick = () => {
+        if (this.state.mode === 'agent') {
+            void this.handleAgentSubmit();
+        } else {
+            void this.handleSubmit();
+        }
+    };
+
+    /** 下拉菜单选择模式：只切换 mode（不提交），输入框提示与主按钮文案随之变化。 */
+    private handleSelectMode = (mode: 'normal' | 'agent') => {
+        this.setState({ mode });
+    };
+
     private handleRemoveChat = (chatId: string) => {
         this.setState((prev) => ({
             selectedChats: prev.selectedChats.filter((c) => c.chat_id !== chatId),
@@ -421,7 +501,7 @@ export default class ChatSummaryNewModal extends Component<
     render() {
         const { visible, onClose } = this.props;
         const {
-            topic, appliedTemplateLabel, customTemplateLimit, templates, selectedChats, showChatSelector, submitting, scheduleConfig, showScheduleConfig, showMoreTemplates,
+            topic, appliedTemplateLabel, customTemplateLimit, mode, templates, selectedChats, showChatSelector, submitting, agentSubmitting, scheduleConfig, showScheduleConfig, showMoreTemplates,
             editingTemplate, creatingCustomTemplate,
             editingTemplateLabel, editingTemplateDescription, savingTemplate,
         } = this.state;
@@ -436,17 +516,56 @@ export default class ChatSummaryNewModal extends Component<
         const isCustomEditor = creatingCustomTemplate || !!editingTemplate?.is_custom;
         const templateEditorVisible = creatingCustomTemplate || !!editingTemplate;
 
+        // 提交进行中（任一路径）时禁用交互，避免并发双提交。
+        const anySubmitting = submitting || agentSubmitting;
+        const canSubmit = !!topic.trim() && !anySubmitting;
+        const isAgent = mode === 'agent';
+        // 主按钮文案随 mode 切换；提交中显示对应「…中」文案。
+        const primaryLabel = isAgent
+            ? (agentSubmitting ? t('summary.create.agentSubmitting') : t('summary.create.agentStart'))
+            : (submitting ? t('summary.create.submitting') : t('summary.create.start'));
+
         const footer = (
             <div className="chat-summary-modal-footer">
-                <Button
-                    theme="solid"
-                    size="default"
-                    loading={submitting}
-                    disabled={!topic.trim() || submitting}
-                    onClick={() => void this.handleSubmit()}
-                >
-                    {submitting ? t('summary.create.submitting') : t('summary.create.start')}
-                </Button>
+                <SplitButtonGroup className="chat-summary-modal-split">
+                    <Button
+                        theme="solid"
+                        size="default"
+                        loading={anySubmitting}
+                        disabled={!canSubmit}
+                        onClick={this.handlePrimaryClick}
+                    >
+                        {primaryLabel}
+                    </Button>
+                    <Dropdown
+                        trigger="click"
+                        position="bottomRight"
+                        render={(
+                            <Dropdown.Menu>
+                                <Dropdown.Item
+                                    active={!isAgent}
+                                    onClick={() => this.handleSelectMode('normal')}
+                                >
+                                    {t('summary.create.start')}
+                                </Dropdown.Item>
+                                <Dropdown.Item
+                                    active={isAgent}
+                                    onClick={() => this.handleSelectMode('agent')}
+                                >
+                                    {t('summary.create.agentStart')}
+                                </Dropdown.Item>
+                            </Dropdown.Menu>
+                        )}
+                    >
+                        <Button
+                            theme="solid"
+                            size="default"
+                            disabled={anySubmitting}
+                            icon={<IconChevronDown />}
+                            aria-label={t('summary.create.switchMode')}
+                        />
+                    </Dropdown>
+                </SplitButtonGroup>
             </div>
         );
 
@@ -475,7 +594,9 @@ export default class ChatSummaryNewModal extends Component<
                             <textarea
                                 ref={this.inputRef}
                                 className="chat-summary-modal-input"
-                                placeholder={t('summary.create.topicPlaceholderInChat')}
+                                placeholder={isAgent
+                                    ? t('summary.create.agentTopicPlaceholder')
+                                    : t('summary.create.topicPlaceholderInChat')}
                                 value={topic}
                                 onChange={(e) => this.setState({ topic: e.target.value, templatePlaceholderRange: null })}
                                 onFocus={this.handleInputFocus}
@@ -486,14 +607,17 @@ export default class ChatSummaryNewModal extends Component<
                                     }
                                 }}
                             />
-                            <VoiceInputButton
-                                inputRef={this.inputRef}
-                                onTranscribed={this.handleVoiceTranscribed}
-                                getCurrentText={() => this.state.topic}
-                                showModeMenu
-                                size="sm"
-                                className="wk-vib--textarea-corner"
-                            />
+                            {/* 主人 D6 决策 B: agent 模式不显示 VoiceInputButton (agent 有自己的输入框) */}
+                            {!isAgent && (
+                                <VoiceInputButton
+                                    inputRef={this.inputRef}
+                                    onTranscribed={this.handleVoiceTranscribed}
+                                    getCurrentText={() => this.state.topic}
+                                    showModeMenu
+                                    size="sm"
+                                    className="wk-vib--textarea-corner"
+                                />
+                            )}
                         </div>
                         {topic.trim() && appliedTemplateLabel && (
                             <div className="summary-template-applied-bar">
