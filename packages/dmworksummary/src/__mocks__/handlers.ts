@@ -32,6 +32,14 @@ export const summaryHandlers = [
         mockTasks.set(taskId, { task_id: taskId, task_no: `SUM-${Date.now()}`, title: body.topic || '新总结', summary_mode: body.summary_mode || 1, status: 0, trigger_type: 1, time_range_start: now, time_range_end: now, sources: body.sources || [], participants: body.participants || [], result: null, error_message: null, origin_channel_id: '', origin_channel_type: 1, created_at: now, updated_at: now });
         return HttpResponse.json({ code: 0, message: 'success', data: { task_id: taskId } });
     }),
+    // Agent summary endpoint - allows offline testing of agent mode
+    http.post('/summary/api/v1/summaries/agent', async ({ request }) => {
+        const body = await request.json() as any;
+        const taskId = ++taskCounter;
+        const now = new Date().toISOString();
+        mockTasks.set(taskId, { task_id: taskId, task_no: `AGENT-${Date.now()}`, title: body.requirement || 'Agent 总结', summary_mode: 2, status: 0, trigger_type: 2, time_range_start: now, time_range_end: now, sources: body.sources || [], participants: [], result: null, error_message: null, origin_channel_id: body.origin_channel_id || '', origin_channel_type: body.origin_channel_type || 1, created_at: now, updated_at: now });
+        return HttpResponse.json({ code: 0, message: 'success', data: { task_id: taskId } });
+    }),
     http.get('/summary/api/v1/summaries', ({ request }) => {
         const url = new URL(request.url);
         const page = parseInt(url.searchParams.get('page') || '1');

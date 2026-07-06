@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "src/index.tsx",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@douyinfe/semi-icons": "^2.93.0",
