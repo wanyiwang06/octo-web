@@ -14,16 +14,37 @@ vi.mock('@douyinfe/semi-ui', () => ({
     Tag: ({ children }: any) => <span data-testid="tag">{children}</span>,
     Avatar: ({ children }: any) => <span data-testid="avatar">{children}</span>,
     Modal: ({ children, visible }: any) => visible ? <div data-testid="modal">{children}</div> : null,
+    SplitButtonGroup: ({ children, className }: any) => (
+        <div data-testid="split-button-group" className={className}>{children}</div>
+    ),
+    Dropdown: Object.assign(
+        ({ children, render }: any) => (
+            <div data-testid="dropdown">
+                {children}
+                <div data-testid="dropdown-menu">{render}</div>
+            </div>
+        ),
+        {
+            Menu: ({ children }: any) => <div data-testid="dropdown-menu-list">{children}</div>,
+            Item: ({ children, onClick, active }: any) => (
+                <button data-testid="dropdown-item" data-active={active} onClick={onClick}>
+                    {children}
+                </button>
+            ),
+        },
+    ),
 }));
 
 vi.mock('@douyinfe/semi-icons', () => ({
     IconPlus: () => <span data-testid="icon-plus" />,
     IconClock: () => <span data-testid="icon-clock" />,
     IconUserGroup: () => <span data-testid="icon-user-group" />,
+    IconChevronDown: () => <span data-testid="icon-chevron-down" />,
 }));
 
 vi.mock('../../api/summaryApi', () => ({
     createSummary: vi.fn().mockResolvedValue({ task_id: 1 }),
+    createAgentSummary: vi.fn().mockResolvedValue({ task_id: 1 }),
     createSchedule: vi.fn().mockResolvedValue({}),
     getTopicTemplatesConfig: vi.fn().mockResolvedValue({ templates: [], custom_template_limit: 30 }),
     updateMyTopicTemplate: vi.fn().mockResolvedValue({}),
