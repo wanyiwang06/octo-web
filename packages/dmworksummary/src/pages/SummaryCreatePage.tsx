@@ -33,7 +33,7 @@ import type {
     TopicTemplate,
 } from "../types/summary";
 import { SummaryMode, SourceType } from "../types/summary";
-import { describeSchedule, scheduleToParams } from "../utils/summaryHelpers";
+import { describeSchedule, scheduleToParams, genSessionId } from "../utils/summaryHelpers";
 import { resolveTemplate, computeTemplateSelection, getTemplateEditableFields, deriveSummaryTitle, type ResolvableTemplate } from "../utils/templateResolver";
 
 const { Text } = Typography;
@@ -100,6 +100,9 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
         editingTemplateDescription: "",
         savingTemplate: false,
     };
+
+    // 同步实例锁：防快速双击/回车的竞态（React state 未刷新时仍能拦住第二次）。
+    private agentSendInFlight = false;
 
     componentDidMount() {
         void this.loadTemplates();
@@ -421,9 +424,12 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
     handleAgentSend = async (text: string) => {
         const trimmed = text.trim();
         if (!trimmed || this.state.agentSubmitting) return;
+        // 同步锁：在读/生成 sessionId 之前拦并发，确保 sessionId 只生成一次。
+        if (this.agentSendInFlight) return;
+        this.agentSendInFlight = true;
 
         // 惰性生成 session_id，整会话复用。
-        const sessionId = this.state.sessionId || crypto.randomUUID();
+        const sessionId = this.state.sessionId || genSessionId();
 
         this.setState((prev) => ({
             messages: [...prev.messages, { role: 'user', content: trimmed }],
@@ -447,6 +453,7 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
                 messages: [...prev.messages, { role: 'assistant', content: msg }],
             }));
         } finally {
+            this.agentSendInFlight = false;
             this.setState({ agentSubmitting: false });
         }
     };
@@ -462,7 +469,7 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
     handleSelectMode = (mode: 'normal' | 'agent') => {
         this.setState((prev) => ({
             mode,
-            sessionId: mode === 'agent' && !prev.sessionId ? crypto.randomUUID() : prev.sessionId,
+            sessionId: mode === 'agent' && !prev.sessionId ? genSessionId() : prev.sessionId,
         }));
     };
 

@@ -11,6 +11,13 @@ import {
 } from "../types/summary";
 import { t } from "@octo/base";
 
+// crypto.randomUUID 在非安全上下文/旧环境可能不存在，降级生成一个唯一 id。
+export function genSessionId(): string {
+    return crypto?.randomUUID
+        ? crypto.randomUUID()
+        : 'sid-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+}
+
 /** 周对应天数 */
 export const DAYS_PER_WEEK = 7;
 /** interval_days 上界（与后端 MaxIntervalDays 对齐） */
