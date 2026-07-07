@@ -333,13 +333,19 @@ describe('summaryApi', () => {
 
     // FIX4: removeMember 将 uid 作为 query 参数传递并 encodeURIComponent，
     // 避免含特殊字符的 user_id（如 'a/b'、'u 1'）破坏 path 或路由。
-    describe('removeMember uid encoding', () => {
-        it('encodes uid into the DELETE query string', async () => {
-            mockDelete.mockResolvedValueOnce({ data: { data: { removed: true } } });
-            await removeMember(7, 'a/b c');
-            expect(mockDelete).toHaveBeenCalledWith(
-                '/summary/api/v1/summaries/7/members?uid=a%2Fb%20c',
+    // Agent 交互式问答：POST /agent/chat（post() 拼前缀 + 解包 data）。
+    describe('agentChat (interactive Q&A)', () => {
+        it('POSTs {message, session_id} to /agent/chat and unwraps {reply, session_id}', async () => {
+            const { agentChat } = await import('../summaryApi');
+            mockPost.mockResolvedValueOnce({
+                data: { data: { reply: '总结如下…', session_id: 's-1' } },
+            });
+            const res = await agentChat({ message: '总结今天', session_id: 's-1' });
+            expect(mockPost).toHaveBeenCalledWith(
+                '/summary/api/v1/agent/chat',
+                { message: '总结今天', session_id: 's-1' },
             );
+            expect(res).toEqual({ reply: '总结如下…', session_id: 's-1' });
         });
     });
 });

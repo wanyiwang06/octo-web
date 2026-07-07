@@ -261,6 +261,24 @@ export interface CreateAgentSummaryParams {
     origin_channel_type?: number;
 }
 
+/** Agent 对话单条消息（user 右气泡 / assistant 左气泡） */
+export interface ChatMessage {
+    role: 'user' | 'assistant';
+    content: string;
+}
+
+/** Agent 对话请求：一问一答，session_id 由前端生成透传（后端一期不存记忆） */
+export interface AgentChatParams {
+    message: string;
+    session_id: string;
+}
+
+/** Agent 对话响应（post() 已解包 data） */
+export interface AgentChatResult {
+    reply: string;
+    session_id: string;
+}
+
 /** 列表查询参数 */
 export interface ListSummariesParams {
     page?: number;

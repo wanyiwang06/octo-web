@@ -1,6 +1,8 @@
 import axios, { AxiosRequestConfig } from 'axios';
 import { WKApp, buildAcceptLanguage } from '@octo/base';
 import type {
+    AgentChatParams,
+    AgentChatResult,
     ApiResponse,
     BatchStatusItem,
     BatchStatusResponse,
@@ -295,6 +297,13 @@ export async function createAgentSummary(
     params: CreateAgentSummaryParams,
 ): Promise<{ task_id: number }> {
     return post('/summaries/agent', params);
+}
+
+// Agent 交互式问答（非流式一问一答）。post() 拼成 /summary/api/v1/agent/chat，
+// nginx rewrite 到后端 /api/v1/agent/chat；复用 post() 的 baseURL/前缀/解包逻辑。
+// 后端一期无记忆，session_id 只透传不存。
+export async function agentChat(params: AgentChatParams): Promise<AgentChatResult> {
+    return post('/agent/chat', params);
 }
 
 export async function listSummaries(

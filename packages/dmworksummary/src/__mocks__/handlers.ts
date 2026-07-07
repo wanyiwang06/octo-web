@@ -40,6 +40,11 @@ export const summaryHandlers = [
         mockTasks.set(taskId, { task_id: taskId, task_no: `AGENT-${Date.now()}`, title: body.requirement || 'Agent 总结', summary_mode: 2, status: 0, trigger_type: 2, time_range_start: now, time_range_end: now, sources: body.sources || [], participants: [], result: null, error_message: null, origin_channel_id: body.origin_channel_id || '', origin_channel_type: body.origin_channel_type || 1, created_at: now, updated_at: now });
         return HttpResponse.json({ code: 0, message: 'success', data: { task_id: taskId } });
     }),
+    // Agent 交互式问答（非流式一问一答）。后端一期无记忆，session_id 只回显。
+    http.post('/summary/api/v1/agent/chat', async ({ request }) => {
+        const body = await request.json() as any;
+        return HttpResponse.json({ code: 0, message: 'success', data: { reply: `echo: ${body.message}`, session_id: body.session_id || 's-mock' } });
+    }),
     http.get('/summary/api/v1/summaries', ({ request }) => {
         const url = new URL(request.url);
         const page = parseInt(url.searchParams.get('page') || '1');

@@ -1,0 +1,88 @@
+/* Agent 交互式问答面板。样式全部走 var(--wk-*)/var(--semi-*) token，不硬编码颜色。 */
+.agent-chat-panel {
+    display: flex;
+    flex-direction: column;
+    /* 弹窗内高度受限：面板占满父容器并让消息列表内部滚动 */
+    height: 100%;
+    min-height: 0;
+    border: 1px solid var(--semi-color-border);
+    border-radius: var(--wk-r-sm, 8px);
+    overflow: hidden;
+}
+
+.agent-chat-panel-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--wk-sp-3, 12px);
+    display: flex;
+    flex-direction: column;
+    gap: var(--wk-sp-2, 8px);
+}
+
+.agent-chat-msg {
+    display: flex;
+}
+
+.agent-chat-msg--user {
+    justify-content: flex-end;
+}
+
+.agent-chat-msg--assistant {
+    justify-content: flex-start;
+}
+
+.agent-chat-bubble {
+    max-width: 80%;
+    padding: var(--wk-sp-2, 8px) var(--wk-sp-3, 12px);
+    border-radius: var(--wk-r-sm, 8px);
+    font-size: 14px;
+    line-height: 20px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* user 右气泡：主色底 + 反白文字 */
+.agent-chat-msg--user .agent-chat-bubble {
+    background-color: var(--semi-color-primary);
+    color: var(--semi-color-white);
+}
+
+/* assistant 左气泡：填充底 + 主文字色 */
+.agent-chat-msg--assistant .agent-chat-bubble {
+    background-color: var(--semi-color-fill-0);
+    color: var(--semi-color-text-0);
+}
+
+.agent-chat-panel-input {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--wk-sp-2, 8px);
+    padding: var(--wk-sp-2, 8px);
+    border-top: 1px solid var(--semi-color-border);
+}
+
+.agent-chat-textarea {
+    flex: 1;
+    resize: none;
+    max-height: 120px;
+    padding: var(--wk-sp-2, 8px);
+    font-size: 14px;
+    font-family: inherit;
+    line-height: 20px;
+    border: 1px solid var(--semi-color-border);
+    border-radius: var(--wk-r-sm, 8px);
+    outline: none;
+    background-color: transparent;
+    color: var(--semi-color-text-0);
+    box-sizing: border-box;
+}
+
+.agent-chat-textarea:focus {
+    border-color: var(--semi-color-primary);
+}
+
+.agent-chat-textarea:disabled {
+    background-color: var(--semi-color-disabled-fill);
+    color: var(--semi-color-disabled-text);
+}
