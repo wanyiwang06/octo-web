@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ChatSummaryNewModal from '../ChatSummaryNewModal';
 import * as summaryApi from '../../api/summaryApi';
 
+import * as summaryHelpers from '../../utils/summaryHelpers';
 vi.mock('@douyinfe/semi-ui', () => ({
     Modal: ({ children, visible, footer, onCancel }: any) =>
         visible ? (
@@ -514,7 +515,119 @@ describe('ChatSummaryNewModal agent session_id persistence + history rehydrate +
         expect(localStorage.getItem('agent-chat-session:ch1')).toBeNull();
         // Other channel untouched.
         expect(localStorage.getItem('agent-chat-session:ch2')).toBe('sid-ch2');
-        expect((ref.current as any).state.messages).toEqual([]);
-        expect((ref.current as any).state.sessionId).toBe('');
+
+describe('ChatSummaryNewModal agent SSE session_id sync', () => {
+    let writeSessionSpy: any;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        // Spy on the actual writeAgentChatSession from summaryHelpers
+        const helpers = require('../../utils/summaryHelpers');
+        writeSessionSpy = vi.spyOn(helpers, 'writeAgentChatSession').mockImplementation(() => {});
     });
+
+    afterEach(() => {
+        writeSessionSpy?.mockRestore();
+    });
+    it('updates sessionId and persists when backend returns different session_id', async () => {
+        const ref = React.createRef<ChatSummaryNewModal>();
+        await act(async () => {
+            render(<ChatSummaryNewModal ref={ref} channelId="ch-123" visible={true} onOk={vi.fn()} onCancel={vi.fn()} />);
+            await flushPromises();
+        });
+
+        const instance = ref.current as any;
+        
+        // Set initial state with client session
+        await act(async () => {
+            instance.setState({ sessionId: 'client-session-abc', mode: 'agent' });
+        });
+
+        // Simulate SSE onDone calling handleAgentAssistantMessage with different session_id
+        await act(async () => {
+            instance.handleAgentAssistantMessage('Server response', 'server-session-xyz');
+            await flushPromises();
+        });
+
+        // Verify writeAgentChatSession was called with the NEW session_id
+        expect(writeSessionSpy).toHaveBeenCalledWith('ch-123', 'server-session-xyz');
+        
+        // Verify state was updated to the NEW session_id
+        expect(instance.state.sessionId).toBe('server-session-xyz');
+        
+        // Verify assistant message was added
+        const lastMessage = instance.state.messages[instance.state.messages.length - 1];
+        expect(lastMessage.role).toBe('assistant');
+        expect(lastMessage.content).toBe('Server response');
+    });
+
+    it('does not persist when backend returns same session_id', async () => {
+        const ref = React.createRef<ChatSummaryNewModal>();
+        await act(async () => {
+            render(<ChatSummaryNewModal ref={ref} channelId="ch-123" visible={true} onOk={vi.fn()} onCancel={vi.fn()} />);
+            await flushPromises();
+        });
+
+        const instance = ref.current as any;
+        
+        // Set initial state with session
+        await act(async () => {
+            instance.setState({ sessionId: 'same-session-id', mode: 'agent' });
+        });
+
+        writeSessionSpy.mockClear();
+
+        // Simulate SSE onDone calling handleAgentAssistantMessage with SAME session_id
+        await act(async () => {
+            instance.handleAgentAssistantMessage('Server response', 'same-session-id');
+            await flushPromises();
+        });
+
+        // Verify writeAgentChatSession was NOT called (no need to persist same value)
+        expect(writeSessionSpy).not.toHaveBeenCalled();
+        
+        // Verify state sessionId remained unchanged
+        expect(instance.state.sessionId).toBe('same-session-id');
+        
+        // Verify assistant message was still added
+        const lastMessage = instance.state.messages[instance.state.messages.length - 1];
+        expect(lastMessage.role).toBe('assistant');
+        expect(lastMessage.content).toBe('Server response');
+    });
+
+    it('does not persist when backend returns undefined session_id', async () => {
+        const ref = React.createRef<ChatSummaryNewModal>();
+        await act(async () => {
+            render(<ChatSummaryNewModal ref={ref} channelId="ch-123" visible={true} onOk={vi.fn()} onCancel={vi.fn()} />);
+            await flushPromises();
+        });
+
+        const instance = ref.current as any;
+        
+        // Set initial state with session
+        await act(async () => {
+            instance.setState({ sessionId: 'current-session-id', mode: 'agent' });
+        });
+
+        writeSessionSpy.mockClear();
+
+        // Simulate SSE onDone calling handleAgentAssistantMessage without session_id
+        await act(async () => {
+            instance.handleAgentAssistantMessage('Server response', undefined);
+            await flushPromises();
+        });
+
+        // Verify writeAgentChatSession was NOT called
+        expect(writeSessionSpy).not.toHaveBeenCalled();
+        
+        // Verify state sessionId remained unchanged
+        expect(instance.state.sessionId).toBe('current-session-id');
+        
+        // Verify assistant message was still added
+        const lastMessage = instance.state.messages[instance.state.messages.length - 1];
+        expect(lastMessage.role).toBe('assistant');
+        expect(lastMessage.content).toBe('Server response');
+    });
+});
+});
 });
