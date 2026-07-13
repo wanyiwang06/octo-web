@@ -87,7 +87,7 @@ describe('AgentChatPanel SSE Mode', () => {
         // Verify agentChat was called with correct params
         expect(summaryApi.agentChat).toHaveBeenCalledWith({
             session_id: 'test-session',
-            question: 'test message',
+            message: 'test message',
             profile: 'summary',
         });
 
@@ -96,6 +96,97 @@ describe('AgentChatPanel SSE Mode', () => {
 
         // Verify onSend was NOT called (SSE branch should not use onSend)
         expect(onSend).not.toHaveBeenCalled();
+    });
+
+    it('should handle successful SSE stream completion', async () => {
+        let savedHandlers: any = null;
+        const onUserMessage = vi.fn();
+        const onAssistantMessage = vi.fn();
+
+        // Mock agentChatStream to capture handlers
+        (summaryApi.agentChatStream as any).mockImplementation((params: any, handlers: any) => {
+            savedHandlers = handlers;
+            // Verify request parameters have correct field names
+            expect(params).toEqual(
+                expect.objectContaining({
+                    session_id: 'test-session',
+                    message: 'test message',
+                    profile: 'summary',
+                })
+            );
+            return { close: vi.fn() };
+        });
+
+        let messages: ChatMessage[] = [];
+        const TestWrapper = () => {
+            const [msgs, setMsgs] = React.useState<ChatMessage[]>(messages);
+
+            return (
+                <I18nContext.Provider value={{ t: mockT, locale: 'zh-CN' }}>
+                    <AgentChatPanel
+                        messages={msgs}
+                        onSend={vi.fn()}
+                        sending={false}
+                        useStream={true}
+                        sessionId="test-session"
+                        profile="summary"
+                        onUserMessage={(text) => {
+                            const newMsgs = [...msgs, { role: 'user' as const, content: text }];
+                            setMsgs(newMsgs);
+                            messages = newMsgs;
+                        }}
+                        onAssistantMessage={(text) => {
+                            onAssistantMessage(text);
+                            const newMsgs = [...msgs, { role: 'assistant' as const, content: text }];
+                            setMsgs(newMsgs);
+                            messages = newMsgs;
+                        }}
+                    />
+                </I18nContext.Provider>
+            );
+        };
+
+        const { container } = render(<TestWrapper />);
+
+        const textarea = screen.getByPlaceholderText('summary.create.agentChatPlaceholder');
+        const sendButton = screen.getByText('summary.create.send');
+
+        // Send message
+        fireEvent.change(textarea, { target: { value: 'test message' } });
+        fireEvent.click(sendButton);
+
+        // Wait for stream to be set up
+        await waitFor(() => expect(savedHandlers).not.toBeNull(), { timeout: 1000 });
+
+        // Simulate progress
+        act(() => {
+            savedHandlers.onProgress({ phase: 'explore', step: 1, detail: 'searching' });
+        });
+
+        // Verify process panel is expanded during streaming
+        await waitFor(() => {
+            const panel = container.querySelector('.agent-chat-process-panel');
+            expect(panel).not.toBeNull();
+            expect(panel).not.toHaveClass('agent-chat-process-panel--collapsed');
+        }, { timeout: 1000 });
+
+        // Trigger onDone with correct field name (reply, not final_answer)
+        act(() => {
+            savedHandlers.onDone({ reply: 'Success response', session_id: 'test-session' });
+        });
+
+        // Verify onAssistantMessage was called with the reply
+        await waitFor(() => {
+            expect(onAssistantMessage).toHaveBeenCalledWith('Success response');
+        }, { timeout: 1000 });
+        // Verify panel is collapsed after completion
+        await waitFor(() => {
+            const panel = container.querySelector('.agent-chat-process-panel');
+            expect(panel).not.toBeNull();
+            if (panel) {
+                expect(panel.classList.contains('agent-chat-process-panel--collapsed')).toBe(true);
+            }
+        }, { timeout: 2000 });
     });
 
     it('should toggle process panel expand/collapse when progress events arrive', async () => {

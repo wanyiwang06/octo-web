@@ -55,7 +55,7 @@ describe('agentChatStream', () => {
         const { close } = agentChatStream(
             {
                 session_id: 'test-session',
-                question: 'test question',
+                message: 'test question',
                 profile: 'summary',
             },
             {
@@ -68,6 +68,17 @@ describe('agentChatStream', () => {
 
         // Wait for async processing
         await new Promise(resolve => setTimeout(resolve, 100));
+        // Verify fetch was called with correct body structure
+        expect(fetchMock).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({
+                body: JSON.stringify({
+                    session_id: 'test-session',
+                    message: 'test question',
+                    profile: 'summary',
+                }),
+            }),
+        );
 
         // The event should be parsed and dispatched
         expect(onProgress).toHaveBeenCalledTimes(1);
@@ -92,7 +103,7 @@ event: progress
 data: {"phase":"fetch","step":2,"detail":"fetching data"}
 
 event: done
-data: {"final_answer":"test result"}
+data: {"reply":"test result"}
 
 `;
 
@@ -120,7 +131,7 @@ data: {"final_answer":"test result"}
         const { close } = agentChatStream(
             {
                 session_id: 'test-session',
-                question: 'test question',
+                message: 'test question',
                 profile: 'summary',
             },
             {
@@ -148,7 +159,7 @@ data: {"final_answer":"test result"}
 
         expect(onDone).toHaveBeenCalledTimes(1);
         expect(onDone).toHaveBeenCalledWith({
-            final_answer: 'test result',
+            reply: 'test result',
         });
 
         close();
@@ -164,7 +175,7 @@ data: {"final_answer":"test result"}
         const { close } = agentChatStream(
             {
                 session_id: 'test-session',
-                question: 'test question',
+                message: 'test question',
                 profile: 'summary',
             },
             {
@@ -207,7 +218,7 @@ data: {"final_answer":"test result"}
         const { close } = agentChatStream(
             {
                 session_id: 'test-session',
-                question: 'test question',
+                message: 'test question',
                 profile: 'summary',
             },
             {
