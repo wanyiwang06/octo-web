@@ -240,7 +240,6 @@ describe('AgentChatPanel SSE Mode', () => {
             expect(onAssistantMessage).toHaveBeenCalledWith('Server response', 'server-session-xyz');
         }, { timeout: 1000 });
     });
-        // Click to collapse
 
     it('should cleanup stream on unmount', async () => {
         const closeFn = vi.fn();
@@ -340,3 +339,57 @@ describe('AgentChatPanel SSE Mode', () => {
         }, { timeout: 2000 });
     });
 });
+
+    it('should allow first send with empty sessionId and pass it to backend', async () => {
+        const onUserMessage = vi.fn();
+        const onAssistantMessage = vi.fn();
+        
+        // Mock agentChatStream to capture params and simulate successful response
+        (summaryApi.agentChatStream as any).mockImplementation((params: any, handlers: any) => {
+            // Verify empty sessionId is passed through
+            expect(params.session_id).toBe('');
+            expect(params.message).toBe('First message');
+            expect(params.profile).toBe('summary');
+            
+            // Simulate backend response with new session_id
+            setImmediate(() => {
+                handlers.onDone?.({ reply: 'Backend response', session_id: 'new-session-123' });
+            });
+            
+            return { close: vi.fn() };
+        });
+        
+        const { container } = render(
+            <I18nContext.Provider value={{ t: mockT, locale: 'zh_CN' }}>
+                <AgentChatPanel
+                    useStream={true}
+                    sessionId=""
+                    profile="summary"
+                    onUserMessage={onUserMessage}
+                    messages={[]}
+                    onAssistantMessage={onAssistantMessage}
+                    onSend={vi.fn()}
+                />
+            </I18nContext.Provider>
+        );
+        
+        const input = container.querySelector('input');
+        const textarea = screen.getByPlaceholderText('summary.create.agentChatPlaceholder');
+        
+        const sendButton = screen.getByText('summary.create.send');
+        // Type and send first message with empty sessionId
+        await act(async () => {
+            fireEvent.change(textarea, { target: { value: 'First message' } });
+        });
+        
+        await act(async () => {
+            fireEvent.click(sendButton);
+        });
+        
+        // Wait for handlers to be called
+        await waitFor(() => {
+            expect(summaryApi.agentChatStream).toHaveBeenCalledWith(expect.objectContaining({ session_id: '', message: 'First message', profile: 'summary' }), expect.any(Object));
+            expect(onUserMessage).toHaveBeenCalledWith('First message');
+            expect(onAssistantMessage).toHaveBeenCalledWith('Backend response', 'new-session-123');
+        }, { timeout: 1000 });
+    });

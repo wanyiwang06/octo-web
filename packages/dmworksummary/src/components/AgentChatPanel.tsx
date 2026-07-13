@@ -95,9 +95,9 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
 
     private startSSEStream = async (text: string) => {
         const { sessionId, profile, onUserMessage, onAssistantMessage } = this.props;
-        if (!sessionId || !profile) {
-            console.error('[AgentChatPanel] useStream=true but missing sessionId/profile');
-            Toast.error('SSE 模式需要 sessionId 和 profile');
+        if (!profile) {
+            console.error('[AgentChatPanel] useStream=true but missing profile');
+            Toast.error('SSE 模式需要 profile');
             return;
         }
 
@@ -144,9 +144,6 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                     const { t } = this.context;
                     Toast.error(`${t('summary.common.agentChat.error')}: ${evt.message}`);
                     this.fallbackToNormalChat(text, sessionId, profile);
-                },
-                onComplete: () => {
-                    this.streamCloseHandle = null;
                 },
             });
 

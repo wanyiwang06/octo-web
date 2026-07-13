@@ -62,7 +62,6 @@ describe('agentChatStream', () => {
                 onProgress,
                 onDone,
                 onError,
-                onComplete: vi.fn(),
             },
         );
 
@@ -138,7 +137,6 @@ data: {"reply":"test result"}
                 onProgress,
                 onDone,
                 onError,
-                onComplete: vi.fn(),
             },
         );
 
@@ -182,7 +180,6 @@ data: {"reply":"test result"}
                 onProgress,
                 onDone,
                 onError,
-                onComplete: vi.fn(),
             },
         );
 
@@ -225,7 +222,6 @@ data: {"reply":"test result"}
                 onProgress: vi.fn(),
                 onDone: vi.fn(),
                 onError: vi.fn(),
-                onComplete: vi.fn(),
             },
         );
 
