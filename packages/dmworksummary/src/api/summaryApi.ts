@@ -29,6 +29,10 @@ import type {
     TopicTemplate,
     TopicTemplatesResponse,
     UpdateScheduleParams,
+    AgentProgressEvent,
+    AgentDoneEvent,
+    AgentErrorEvent,
+    AgentStreamHandlers,
 } from '../types/summary';
 import { SummaryMode } from '../types/summary';
 
@@ -331,6 +335,128 @@ export async function getAgentChatHistory(sessionId: string): Promise<AgentChatH
         session_id: data?.session_id || sessionId,
         messages: Array.isArray(data?.messages) ? data!.messages : [],
     };
+}
+
+/**
+ * Agent 交互式问答 SSE 流式版。POST /summary/api/v1/agent/chat/stream。
+ * 手动消费 fetch + ReadableStream 解析 SSE 帧(不用 EventSource — EventSource 不支持 POST body)。
+ * 
+ * @param params - 请求参数(和 agentChat 一致)
+ * @param handlers - 事件回调: onProgress / onDone / onError
+ * @returns {{ close: () => void }} - 关闭 reader 的句柄,组件卸载/用户取消时调用
+ */
+export function agentChatStream(
+    params: AgentChatParams,
+    handlers: AgentStreamHandlers,
+): { close: () => void } {
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    let aborted = false;
+
+    const url = `${resolveSummaryBaseURL()}${BASE}/agent/chat/stream`;
+    const token = WKApp.loginInfo.token;
+    const spaceId = WKApp.shared.currentSpaceId;
+
+    // 启动消费
+    (async () => {
+        try {
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                'Accept-Language': buildAcceptLanguage(),
+            };
+            if (token) headers['token'] = token;
+            if (spaceId) headers['X-Space-Id'] = spaceId;
+
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(params),
+            });
+
+            if (!resp.ok) {
+                const text = await resp.text();
+                let errMsg = `HTTP ${resp.status}`;
+                try {
+                    const json = JSON.parse(text);
+                    errMsg = json?.message || errMsg;
+                } catch {
+                    // text 不是 JSON,用 HTTP status
+                }
+                throw new Error(errMsg);
+            }
+
+            if (!resp.body) {
+                throw new Error('Response body is null');
+            }
+
+            reader = resp.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buffer = '';
+
+            while (!aborted) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || ''; // 最后一行可能不完整,留在 buffer
+
+                let currentEvent = '';
+                let currentData = '';
+
+                for (const line of lines) {
+                    if (line.startsWith('event:')) {
+                        currentEvent = line.slice(6).trim();
+                    } else if (line.startsWith('data:')) {
+                        currentData = line.slice(5).trim();
+                    } else if (line === '') {
+                        // 空行是帧边界,解析并分发
+                        if (currentEvent && currentData) {
+                            parseAndDispatch(currentEvent, currentData, handlers);
+                        }
+                        currentEvent = '';
+                        currentData = '';
+                    }
+                }
+            }
+        } catch (err: unknown) {
+            if (aborted) return; // 用户手动关闭,不回调 error
+            const msg = err instanceof Error ? err.message : String(err);
+            handlers.onError?.({ code: 50000, message: msg });
+        } finally {
+            reader?.releaseLock();
+        }
+    })();
+
+    return {
+        close: () => {
+            aborted = true;
+            reader?.cancel();
+        },
+    };
+}
+
+/** 解析 SSE data 并分发到对应 handler */
+function parseAndDispatch(event: string, data: string, handlers: AgentStreamHandlers): void {
+    try {
+        const parsed = JSON.parse(data);
+        switch (event) {
+            case 'progress':
+                handlers.onProgress?.(parsed as AgentProgressEvent);
+                break;
+            case 'done':
+                handlers.onDone?.(parsed as AgentDoneEvent);
+                break;
+            case 'error':
+                handlers.onError?.(parsed as AgentErrorEvent);
+                break;
+            default:
+                // 未知事件忽略
+                break;
+        }
+    } catch (err) {
+        // JSON 解析失败,忽略该帧
+        console.warn('Failed to parse SSE data:', data, err);
+    }
 }
 
 export async function listSummaries(

@@ -650,6 +650,8 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
                         // Agent 交互式问答：面板自带输入框，隐藏顶部大 textarea + 4 模板卡片。
                         <div className="summary-workbench-agent-chat">
                             <AgentChatPanel
+                                sessionId={this.state.sessionId}
+                                profile="summary"
                                 messages={messages}
                                 onSend={this.handleAgentSend}
                                 sending={agentSubmitting}

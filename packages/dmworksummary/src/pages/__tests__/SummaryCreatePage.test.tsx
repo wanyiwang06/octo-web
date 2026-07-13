@@ -11,6 +11,8 @@ vi.mock('@douyinfe/semi-ui', () => ({
         </button>
     ),
     Toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
+    Input: ({ value, onChange, ...rest }: any) => <input value={value} onChange={(e) => onChange?.(e.target.value)} {...rest} />,
+    Modal: ({ children, visible, onOk, onCancel }: any) => visible ? <div data-testid="modal">{children}</div> : null,
     Typography: { Text: ({ children }: any) => <span>{children}</span> },
     Tag: ({ children }: any) => <span data-testid="tag">{children}</span>,
     Avatar: ({ children }: any) => <span data-testid="avatar">{children}</span>,

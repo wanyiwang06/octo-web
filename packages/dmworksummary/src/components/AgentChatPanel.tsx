@@ -1,57 +1,76 @@
 import React, { Component, createRef } from 'react';
 import { Button, Modal, Input, Toast } from '@douyinfe/semi-ui';
 import { I18nContext } from '@octo/base';
-import type { ChatMessage } from '../types/summary';
+import type { ChatMessage, AgentProgressEvent, AgentDoneEvent, AgentErrorEvent } from '../types/summary';
+import { agentChatStream } from '../api/summaryApi';
 import './AgentChatPanel.css';
 
 interface AgentChatPanelProps {
     messages: ChatMessage[];
     onSend: (text: string) => void;
     sending: boolean;
-    /** 可选开场气泡（assistant 视角），无消息时展示在列表顶部 */
     welcome?: string;
-    /** 可选：「保存为总结」回调,返回 Promise 表示成功/失败 */
     onSaveAsSummary?: (title: string) => Promise<boolean>;
-    /** 保存中状态 */
     savingSummary?: boolean;
-    /**
-     * 可选「新会话」动作。提供时面板顶部渲染一个轻量「新会话」按钮，
-     * 点击后由父组件清掉当前 session_id + 清空消息，开一条独立新会话。
-     * 不提供则不渲染头部（保持旧行为）。
-     */
     onNewSession?: () => void;
+    useStream?: boolean;
+    sessionId?: string;
+    profile?: string;
+}
+
+interface ProgressStep {
+    phase: string;
+    step: number;
+    detail: string;
+    timestamp: number;
 }
 
 interface AgentChatPanelState {
     input: string;
     showSaveDialog: boolean;
     summaryTitle: string;
+    isStreaming: boolean;
+    progressSteps: ProgressStep[];
+    processExpanded: boolean;
+    streamStartTime: number;
 }
 
-/**
- * Agent 交互式问答面板：多轮气泡 UI + 底部输入框。
- * 受控消息由父组件持有（含 session_id 透传）；本组件只负责渲染与输入交互。
- */
 export default class AgentChatPanel extends Component<AgentChatPanelProps, AgentChatPanelState> {
     static contextType = I18nContext;
     declare context: React.ContextType<typeof I18nContext>;
 
-    // 滚动容器：新消息 / sending 变化时自动滚到底
     private listRef = createRef<HTMLDivElement>();
+    private streamCloseHandle: (() => void) | null = null;
 
     state: AgentChatPanelState = { 
         input: '', 
         showSaveDialog: false,
         summaryTitle: '',
+        isStreaming: false,
+        progressSteps: [],
+        processExpanded: true,
+        streamStartTime: 0,
     };
 
     componentDidMount() {
         this.scrollToBottom();
     }
 
-    componentDidUpdate(prev: AgentChatPanelProps) {
-        if (prev.messages.length !== this.props.messages.length || prev.sending !== this.props.sending) {
+    componentDidUpdate(prev: AgentChatPanelProps, prevState: AgentChatPanelState) {
+        if (
+            prev.messages.length !== this.props.messages.length || 
+            prev.sending !== this.props.sending ||
+            prevState.isStreaming !== this.state.isStreaming ||
+            prevState.progressSteps.length !== this.state.progressSteps.length
+        ) {
             this.scrollToBottom();
+        }
+    }
+
+    componentWillUnmount() {
+        if (this.streamCloseHandle) {
+            this.streamCloseHandle();
+            this.streamCloseHandle = null;
         }
     }
 
@@ -60,17 +79,104 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
         if (el) el.scrollTop = el.scrollHeight;
     };
 
-    // 发送后清空输入框；sending 中禁止并发发送。
     private handleSend = () => {
         const text = this.state.input.trim();
-        if (!text || this.props.sending) return;
-        this.props.onSend(text);
-        this.setState({ input: '' });
+        if (!text || this.props.sending || this.state.isStreaming) return;
+
+        if (this.props.useStream) {
+            this.startSSEStream(text);
+        } else {
+            this.props.onSend(text);
+            this.setState({ input: '' });
+        }
     };
 
-    // 回车发送，Shift+Enter 换行。输入法组字中的 Enter 是确认候选词，不发送。
+    private startSSEStream = async (text: string) => {
+        const { sessionId, profile } = this.props;
+        if (!sessionId || !profile) {
+            console.error('[AgentChatPanel] useStream=true but missing sessionId/profile');
+            Toast.error('SSE 模式需要 sessionId 和 profile');
+            return;
+        }
+
+        this.setState({
+            input: '',
+            isStreaming: true,
+            progressSteps: [],
+            processExpanded: true,
+            streamStartTime: Date.now(),
+        });
+
+        this.props.onSend(text);
+
+        try {
+            const { close } = await agentChatStream({
+                session_id: sessionId,
+                question: text,
+                profile,
+                onProgress: (evt: AgentProgressEvent) => {
+                    this.setState(prev => ({
+                        progressSteps: [
+                            ...prev.progressSteps,
+                            {
+                                phase: evt.phase,
+                                step: evt.step,
+                                detail: evt.detail,
+                                timestamp: Date.now(),
+                            },
+                        ],
+                    }));
+                },
+                onDone: (evt: AgentDoneEvent) => {
+                    const reply = evt.final_answer || '（无回复）';
+                    this.props.onSend(reply);
+                    this.setState({
+                        isStreaming: false,
+                        processExpanded: false,
+                    });
+                    this.streamCloseHandle = null;
+                },
+                onError: (evt: AgentErrorEvent) => {
+                    const { t } = this.context;
+                    Toast.error(`${t('summary.common.agentChat.error')}: ${evt.message}`);
+                    this.fallbackToNormalChat(text, sessionId, profile);
+                },
+                onComplete: () => {
+                    this.streamCloseHandle = null;
+                },
+            });
+
+            this.streamCloseHandle = close;
+
+        } catch (err: any) {
+            const { t } = this.context;
+            console.error('[AgentChatPanel] SSE stream failed:', err);
+            Toast.warning(t('summary.common.agentChat.streamInterrupted'));
+            this.fallbackToNormalChat(text, sessionId, profile);
+        }
+    };
+
+    private fallbackToNormalChat = async (text: string, sessionId: string, profile: string) => {
+        const { t } = this.context;
+        try {
+            const res = await fetch('/summary/api/v1/agent/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text, session_id: sessionId, profile }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            const reply = data.reply || '（无回复）';
+            this.props.onSend(reply);
+        } catch (err: any) {
+            Toast.error(t('summary.common.createFailed'));
+            console.error('[AgentChatPanel] Fallback agentChat failed:', err);
+        } finally {
+            this.setState({ isStreaming: false });
+        }
+    };
+
     private handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        // isComposing 覆盖 React 合成事件下的 IME 组字态；keyCode 229 兜底老浏览器。
         if (e.nativeEvent.isComposing || (e as any).keyCode === 229) return;
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -78,12 +184,10 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
         }
     };
 
-    // 检查是否有 assistant 产出（至少一条 assistant 回复）
     private hasAssistantOutput = (): boolean => {
         return this.props.messages.some(m => m.role === 'assistant');
     };
 
-    // 打开保存对话框
     private handleOpenSaveDialog = () => {
         const { t } = this.context;
         if (!this.hasAssistantOutput()) {
@@ -93,7 +197,6 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
         this.setState({ showSaveDialog: true, summaryTitle: '' });
     };
 
-    // 提交保存 - 异步等待结果,成功才关闭对话框
     private handleSaveConfirm = async () => {
         const { t } = this.context;
         const title = this.state.summaryTitle.trim();
@@ -105,17 +208,61 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
         
         const success = await this.props.onSaveAsSummary(title);
         if (success) {
-            // 成功才关闭对话框并清空标题
             this.setState({ showSaveDialog: false, summaryTitle: '' });
         }
-        // 失败时保留对话框和已填标题,方便用户重试
+    };
+
+    private renderProcessPanel = () => {
+        const { t } = this.context;
+        const { progressSteps, processExpanded, streamStartTime, isStreaming } = this.state;
+
+        if (!this.props.useStream || progressSteps.length === 0) return null;
+
+        const elapsed = streamStartTime ? Math.round((Date.now() - streamStartTime) / 1000) : 0;
+
+        return (
+            <div className={`agent-chat-process-panel${processExpanded ? '' : ' agent-chat-process-panel--collapsed'}`}>
+                <button
+                    className="agent-chat-process-toggle"
+                    onClick={() => this.setState(prev => ({ processExpanded: !prev.processExpanded }))}
+                >
+                    {processExpanded ? '▼' : '▶'} {t('summary.common.agentChat.viewGenerationProcess')} ({progressSteps.length} {t('summary.common.agentChat.stepsCount')})
+                </button>
+                
+                {processExpanded && (
+                    <>
+                        <div className="agent-chat-process-timeline">
+                            {progressSteps.map((step, i) => (
+                                <div key={i} className="agent-chat-process-item">
+                                    <span className="agent-chat-process-label">
+                                        {t(`summary.common.agentChat.progress.${step.phase}`) || step.phase}
+                                    </span>
+                                    <span className="agent-chat-process-detail">: {step.detail}</span>
+                                </div>
+                            ))}
+                            {isStreaming && (
+                                <div className="agent-chat-process-item agent-chat-process-item--loading">
+                                    <span className="agent-chat-process-spinner">⏳</span>
+                                    <span>{t('summary.common.agentChat.generating')}</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="agent-chat-process-meta">
+                            {t('summary.common.agentChat.generationTime')}: {elapsed}s
+                        </div>
+                    </>
+                )}
+            </div>
+        );
     };
 
     render() {
         const { messages, sending, welcome, savingSummary, onNewSession } = this.props;
-        const { input, showSaveDialog, summaryTitle } = this.state;
+        const { input, showSaveDialog, summaryTitle, isStreaming } = this.state;
         const { t } = this.context;
         const canSave = this.hasAssistantOutput() && this.props.onSaveAsSummary;
+
+        const isBusy = sending || isStreaming;
 
         return (
             <div className="agent-chat-panel">
@@ -124,7 +271,7 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                         <Button
                             theme="borderless"
                             size="small"
-                            disabled={sending}
+                            disabled={isBusy}
                             onClick={onNewSession}
                         >
                             {t('summary.create.newSession')}
@@ -142,16 +289,28 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                             key={i}
                             className={`agent-chat-msg agent-chat-msg--${m.role}`}
                         >
-                            <div className="agent-chat-bubble">{m.content}</div>
+                            <div className="agent-chat-bubble">
+                                {m.content}
+                                {m.role === 'assistant' && i === messages.length - 1 && this.props.useStream && (
+                                    this.renderProcessPanel()
+                                )}
+                            </div>
                         </div>
                     ))}
+                    {isStreaming && messages.length > 0 && messages[messages.length - 1].role !== 'assistant' && (
+                        <div className="agent-chat-msg agent-chat-msg--assistant">
+                            <div className="agent-chat-bubble">
+                                {this.renderProcessPanel()}
+                            </div>
+                        </div>
+                    )}
                 </div>
                 <div className="agent-chat-panel-input">
                     <textarea
                         className="agent-chat-textarea"
                         value={input}
                         placeholder={t('summary.create.agentChatPlaceholder')}
-                        disabled={sending}
+                        disabled={isBusy}
                         rows={1}
                         onChange={(e) => this.setState({ input: e.target.value })}
                         onKeyDown={this.handleKeyDown}
@@ -159,8 +318,8 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                     <Button
                         theme="solid"
                         size="default"
-                        loading={sending}
-                        disabled={sending || !input.trim()}
+                        loading={isBusy}
+                        disabled={isBusy || !input.trim()}
                         onClick={this.handleSend}
                     >
                         {t('summary.create.send')}
@@ -178,7 +337,6 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                     )}
                 </div>
 
-                {/* 保存为总结命名对话框 */}
                 <Modal
                     title={t('summary.create.saveDialogTitle')}
                     visible={showSaveDialog}
