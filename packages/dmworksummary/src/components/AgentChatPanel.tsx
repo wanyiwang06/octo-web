@@ -16,7 +16,7 @@ interface AgentChatPanelProps {
     useStream?: boolean;
     sessionId?: string;
     profile?: string;
-    onAssistantMessage?: (text: string) => void;
+    onAssistantMessage?: (text: string, sessionId?: string) => void;
     onUserMessage?: (text: string) => void;
 }
 
@@ -133,7 +133,7 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                 },
                 onDone: (evt: AgentDoneEvent) => {
                     const reply = evt.reply || '（无回复）';
-                    onAssistantMessage?.(reply);
+                    onAssistantMessage?.(reply, evt.session_id);
                     this.setState({
                         isStreaming: false,
                         processExpanded: false,
