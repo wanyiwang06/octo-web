@@ -3,6 +3,7 @@ import { Button, Modal, Input, Toast } from '@douyinfe/semi-ui';
 import { I18nContext } from '@octo/base';
 import type { ChatMessage, AgentProgressEvent, AgentDoneEvent, AgentErrorEvent } from '../types/summary';
 import { agentChatStream, agentChat } from '../api/summaryApi';
+import { genSessionId } from '../utils/summaryHelpers';
 import './AgentChatPanel.css';
 
 interface AgentChatPanelProps {
@@ -17,7 +18,7 @@ interface AgentChatPanelProps {
     sessionId?: string;
     profile?: string;
     onAssistantMessage?: (text: string, sessionId?: string) => void;
-    onUserMessage?: (text: string) => void;
+    onUserMessage?: (text: string, sessionId?: string) => void;
 }
 
 interface ProgressStep {
@@ -94,7 +95,8 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
     };
 
     private startSSEStream = async (text: string) => {
-        const { sessionId, profile, onUserMessage, onAssistantMessage } = this.props;
+        const { sessionId: propsSessionId, profile, onUserMessage, onAssistantMessage } = this.props;
+        const sessionId = propsSessionId || genSessionId();
         if (!profile) {
             console.error('[AgentChatPanel] useStream=true but missing profile');
             Toast.error('SSE 模式需要 profile');
@@ -109,8 +111,8 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
             streamStartTime: Date.now(),
         });
 
-        // 先本地追加 user 消息(纯 UI,不发请求)
-        onUserMessage?.(text);
+        // 先本地追加 user 消息(纯 UI,不发请求); 传 sessionId 让父组件持久化
+        onUserMessage?.(text, sessionId);
 
         try {
             const { close } = agentChatStream({
@@ -142,7 +144,7 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                 },
                 onError: (evt: AgentErrorEvent) => {
                     const { t } = this.context;
-                    Toast.error(`${t('summary.common.agentChat.error')}: ${evt.message}`);
+                    Toast.error(`${t('summary.create.error')}: ${evt.message}`);
                     this.fallbackToNormalChat(text, sessionId, profile);
                 },
             });
@@ -152,7 +154,7 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
         } catch (err: any) {
             const { t } = this.context;
             console.error('[AgentChatPanel] SSE stream failed:', err);
-            Toast.warning(t('summary.common.agentChat.streamInterrupted'));
+            Toast.warning(t('summary.create.streamInterrupted'));
             this.fallbackToNormalChat(text, sessionId, profile);
         }
     };
@@ -226,7 +228,7 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                     className="agent-chat-process-toggle"
                     onClick={() => this.setState(prev => ({ processExpanded: !prev.processExpanded }))}
                 >
-                    {processExpanded ? '▼' : '▶'} {t('summary.common.agentChat.viewGenerationProcess')} ({progressSteps.length} {t('summary.common.agentChat.stepsCount')})
+                    {processExpanded ? '▼' : '▶'} {t('summary.create.viewGenerationProcess')} ({progressSteps.length} {t('summary.create.stepsCount')})
                 </button>
                 
                 {processExpanded && (
@@ -235,7 +237,7 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                             {progressSteps.map((step, i) => (
                                 <div key={i} className="agent-chat-process-item">
                                     <span className="agent-chat-process-label">
-                                        {t(`summary.common.agentChat.progress.${step.phase}`) || step.phase}
+                                        {t(`summary.create.progress.${step.phase}`) || step.phase}
                                     </span>
                                     <span className="agent-chat-process-detail">: {step.detail}</span>
                                 </div>
@@ -243,12 +245,12 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                             {isStreaming && (
                                 <div className="agent-chat-process-item agent-chat-process-item--loading">
                                     <span className="agent-chat-process-spinner">⏳</span>
-                                    <span>{t('summary.common.agentChat.generating')}</span>
+                                    <span>{t('summary.create.generating')}</span>
                                 </div>
                             )}
                         </div>
                         <div className="agent-chat-process-meta">
-                            {t('summary.common.agentChat.generationTime')}: {elapsed}s
+                            {t('summary.create.generationTime')}: {elapsed}s
                         </div>
                     </>
                 )}

@@ -79,7 +79,7 @@ describe('AgentChatPanel SSE Mode', () => {
         fireEvent.click(sendButton);
 
         // Wait for user message callback
-        await waitFor(() => expect(onUserMessage).toHaveBeenCalledWith('test message'), { timeout: 2000 });
+        await waitFor(() => expect(onUserMessage).toHaveBeenCalledWith('test message', expect.any(String)), { timeout: 2000 });
 
         // Wait for error handling and fallback
         await waitFor(() => expect(summaryApi.agentChat).toHaveBeenCalled(), { timeout: 2000 });
@@ -344,52 +344,87 @@ describe('AgentChatPanel SSE Mode', () => {
         const onUserMessage = vi.fn();
         const onAssistantMessage = vi.fn();
         
-        // Mock agentChatStream to capture params and simulate successful response
-        (summaryApi.agentChatStream as any).mockImplementation((params: any, handlers: any) => {
-            // Verify empty sessionId is passed through
-            expect(params.session_id).toBe('');
-            expect(params.message).toBe('First message');
-            expect(params.profile).toBe('summary');
-            
-            // Simulate backend response with new session_id
-            setImmediate(() => {
-                handlers.onDone?.({ reply: 'Backend response', session_id: 'new-session-123' });
+        // Unmock agentChatStream temporarily so it uses real fetch
+        const originalAgentChatStream = await vi.importActual<typeof summaryApi>('../../api/summaryApi');
+        vi.mocked(summaryApi.agentChatStream).mockImplementation(originalAgentChatStream.agentChatStream);
+        
+        // Mock fetch to capture the actual HTTP request body
+        const originalFetch = global.fetch;
+        const fetchMock = vi.fn().mockImplementation(() => {
+            // Return a mock ReadableStream for SSE
+            const encoder = new TextEncoder();
+            const stream = new ReadableStream({
+                start(controller) {
+                    controller.enqueue(encoder.encode('event: done\n'));
+                    controller.enqueue(encoder.encode('data: {"reply":"Backend response","session_id":"new-session-123"}\n\n'));
+                    controller.close();
+                },
             });
             
-            return { close: vi.fn() };
+            return Promise.resolve({
+                ok: true,
+                body: stream,
+                headers: new Headers({ 'content-type': 'text/event-stream' }),
+            });
         });
+        global.fetch = fetchMock as any;
         
-        const { container } = render(
-            <I18nContext.Provider value={{ t: mockT, locale: 'zh_CN' }}>
-                <AgentChatPanel
-                    useStream={true}
-                    sessionId=""
-                    profile="summary"
-                    onUserMessage={onUserMessage}
-                    messages={[]}
-                    onAssistantMessage={onAssistantMessage}
-                    onSend={vi.fn()}
-                />
-            </I18nContext.Provider>
-        );
-        
-        const input = container.querySelector('input');
-        const textarea = screen.getByPlaceholderText('summary.create.agentChatPlaceholder');
-        
-        const sendButton = screen.getByText('summary.create.send');
-        // Type and send first message with empty sessionId
-        await act(async () => {
-            fireEvent.change(textarea, { target: { value: 'First message' } });
-        });
-        
-        await act(async () => {
-            fireEvent.click(sendButton);
-        });
-        
-        // Wait for handlers to be called
-        await waitFor(() => {
-            expect(summaryApi.agentChatStream).toHaveBeenCalledWith(expect.objectContaining({ session_id: '', message: 'First message', profile: 'summary' }), expect.any(Object));
-            expect(onUserMessage).toHaveBeenCalledWith('First message');
-            expect(onAssistantMessage).toHaveBeenCalledWith('Backend response', 'new-session-123');
-        }, { timeout: 1000 });
+        try {
+            const { container } = render(
+                <I18nContext.Provider value={{ t: mockT, locale: 'zh_CN' }}>
+                    <AgentChatPanel
+                        useStream={true}
+                        sessionId=""
+                        profile="summary"
+                        onUserMessage={onUserMessage}
+                        messages={[]}
+                        onAssistantMessage={onAssistantMessage}
+                        onSend={vi.fn()}
+                    />
+                </I18nContext.Provider>
+            );
+            
+            const textarea = screen.getByPlaceholderText('summary.create.agentChatPlaceholder');
+            const sendButton = screen.getByText('summary.create.send');
+            
+            // Type and send first message with empty sessionId
+            await act(async () => {
+                fireEvent.change(textarea, { target: { value: 'First message' } });
+            });
+            
+            await act(async () => {
+                fireEvent.click(sendButton);
+            });
+            
+            // Wait for fetch to be called and verify the request body
+            await waitFor(() => {
+                expect(fetchMock).toHaveBeenCalledTimes(1);
+            }, { timeout: 1000 });
+            
+            // Parse the request body and verify sessionId is NOT empty
+            const fetchCall = fetchMock.mock.calls[0];
+            const requestInit = fetchCall[1] as RequestInit;
+            const body = JSON.parse(requestInit.body as string);
+            
+            // Critical assertion: sessionId must NOT be empty string
+            expect(body.session_id).not.toBe('');
+            expect(body.session_id).toBeTruthy();
+            expect(body.session_id).toMatch(/./);  // At least 1 character
+            expect(body.message).toBe('First message');
+            expect(body.profile).toBe('summary');
+            
+            // Verify onUserMessage was called with non-empty sessionId
+            expect(onUserMessage).toHaveBeenCalledWith('First message', expect.stringMatching(/./));
+            expect(onUserMessage.mock.calls[0][1]).not.toBe('');
+            
+            // Wait for onAssistantMessage to be called
+            await waitFor(() => {
+                expect(onAssistantMessage).toHaveBeenCalledWith('Backend response', 'new-session-123');
+            }, { timeout: 1000 });
+        } finally {
+            // Restore original fetch
+            global.fetch = originalFetch;
+            // Restore mock
+            vi.mocked(summaryApi.agentChatStream).mockReset();
+        }
     });

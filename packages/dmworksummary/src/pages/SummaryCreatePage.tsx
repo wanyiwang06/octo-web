@@ -305,17 +305,21 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
     /** 主按钮点击：normal 走普通提交；agent 输入走面板底部输入框，主按钮无需提交。 */
 
     /** SSE 模式：追加 user 消息(仅 UI,不发请求)。 */
-    handleAgentUserMessage = (text: string) => {
+handleAgentUserMessage = (text: string, incomingSessionId?: string) => {
         const trimmed = text.trim();
         if (!trimmed) return;
         
-        // 惰性生成 session_id，整会话复用
-        const sessionId = this.state.sessionId || genSessionId();
-        writeAgentChatSession(this.agentChannelId(), sessionId);
+        // 优先用 panel 传来的 id，否则兜底生成（panel 内已生成时直接复用）
+        const nextSessionId = incomingSessionId || this.state.sessionId || genSessionId();
+        
+        // 只在 sessionId 变化时才写入 localStorage
+        if (nextSessionId !== this.state.sessionId) {
+            writeAgentChatSession(this.agentChannelId(), nextSessionId);
+        }
 
         this.setState((prev) => ({
             messages: [...prev.messages, { role: 'user', content: trimmed }],
-            sessionId,
+            sessionId: nextSessionId,
         }));
     };
 
