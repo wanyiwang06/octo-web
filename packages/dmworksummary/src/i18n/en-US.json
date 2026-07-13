@@ -133,6 +133,14 @@
     "createFirst": "Create first summary",
     "leaveSuccess": "Left",
     "leaveFailed": "Failed to leave"
+    ,"refineTitle": "Refine Summary"
+    ,"refinePlaceholder": "Enter refinement instructions, e.g. \"Expand the risk section into a full paragraph\""
+    ,"refineSubmit": "Submit Refinement"
+    ,"refineSuccess": "Refinement successful, updated to version {{version}}"
+    ,"refineNotSupported": "This summary does not support refinement"
+    ,"refineNotCreator": "You are not the creator of this summary and cannot modify it"
+    ,"refineNoSnapshot": "This summary data version is too old and cannot be refined"
+    ,"refineFailed": "Refinement failed, please try again later"
   },
   "create": {
     "title": "AI Summary",
@@ -478,7 +486,15 @@
     "teamRegeneratingWaitingDesc": "Your personal summary is ready. The team summary will be generated after other members finish.",
     "refiningPersonal": "Adjusting your current summary based on feedback...",
     "refiningTeam": "Adjusting the team summary based on feedback...",
-    "refiningSummary": "Adjusting the summary based on feedback..."
+    "refiningSummary": "Adjusting the summary based on feedback...",
+    "refineTitle": "Refine Summary",
+    "refinePlaceholder": "Enter refinement instructions, e.g. \"Expand the risk section into a full paragraph\"",
+    "refineSubmit": "Submit Refinement",
+    "refineSuccess": "Refinement successful, updated to version {{version}}",
+    "refineNotSupported": "This summary does not support refinement",
+    "refineNotCreator": "You are not the creator of this summary and cannot modify it",
+    "refineNoSnapshot": "This summary data version is too old and cannot be refined",
+    "refineFailed": "Refinement failed, please try again later"
   },
   "summaryCard": {
     "createdBy": "Created by {{name}}",

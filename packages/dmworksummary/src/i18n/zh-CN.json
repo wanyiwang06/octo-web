@@ -478,7 +478,15 @@
     "teamRegeneratingWaitingDesc": "你的个人总结已完成，正在等待其他成员完成后生成团队汇总。",
     "refiningPersonal": "正在按意见调整当前总结...",
     "refiningTeam": "正在按意见调整团队汇总...",
-    "refiningSummary": "正在按意见调整总结内容..."
+    "refiningSummary": "正在按意见调整总结内容...",
+    "refineTitle": "反馈修改",
+    "refinePlaceholder": "输入修改需求，如「把风险章节扩充成一整段」",
+    "refineSubmit": "提交修改",
+    "refineSuccess": "修改成功，已更新到版本 {{version}}",
+    "refineNotSupported": "本总结不支持增量修改",
+    "refineNotCreator": "你不是本总结的创建者，无法修改",
+    "refineNoSnapshot": "本总结数据版本较老，无法增量修改",
+    "refineFailed": "修改失败，请稍后重试"
   },
   "summaryCard": {
     "createdBy": "{{name}} 发起",
