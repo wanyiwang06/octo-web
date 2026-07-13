@@ -480,6 +480,7 @@
     "refiningTeam": "正在按意见调整团队汇总...",
     "refiningSummary": "正在按意见调整总结内容...",
     "refineTitle": "反馈修改",
+    "refineEmptyInput": "请输入修改需求",
     "refinePlaceholder": "输入修改需求，如「把风险章节扩充成一整段」",
     "refineSubmit": "提交修改",
     "refineSuccess": "修改成功，已更新到版本 {{version}}",
