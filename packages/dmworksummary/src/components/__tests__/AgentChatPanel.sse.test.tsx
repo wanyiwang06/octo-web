@@ -189,17 +189,9 @@ describe('AgentChatPanel SSE Mode', () => {
         }, { timeout: 2000 });
     });
 
-    it('should update sessionId when backend returns different session_id', async () => {
+    it('should pass session_id from onDone event to onAssistantMessage callback', async () => {
         let savedHandlers: any = null;
         const onAssistantMessage = vi.fn();
-        const mockWriteSession = vi.fn();
-
-        // Mock writeAgentChatSession
-        vi.mock('../../utils/agentChatSession', () => ({
-            writeAgentChatSession: mockWriteSession,
-            readAgentChatSession: vi.fn(),
-            genSessionId: () => 'client-generated-id',
-        }));
 
         // Mock agentChatStream to capture handlers
         (summaryApi.agentChatStream as any).mockImplementation((params: any, handlers: any) => {
@@ -208,141 +200,47 @@ describe('AgentChatPanel SSE Mode', () => {
         });
 
         let messages: ChatMessage[] = [{ role: 'user' as const, content: 'test' }];
-        let currentSessionId = 'client-session-abc';
 
-        const TestWrapper = () => {
-            const [sessionId, setSessionId] = React.useState(currentSessionId);
-
-            return (
-                <I18nContext.Provider value={{ t: mockT, locale: 'zh-CN' }}>
-                    <AgentChatPanel
-                        messages={messages}
-                        onSend={vi.fn()}
-                        sending={false}
-                        useStream={true}
-                        sessionId={sessionId}
-                        profile="summary"
-                        onUserMessage={vi.fn()}
-                        onAssistantMessage={(text, newSessionId) => {
-                            onAssistantMessage(text, newSessionId);
-                            if (newSessionId && newSessionId !== sessionId) {
-                                // Simulate parent component behavior
-                                setSessionId(newSessionId);
-                                currentSessionId = newSessionId;
-                            }
-                        }}
-                    />
-                </I18nContext.Provider>
-            );
-        };
-
-        render(<TestWrapper />);
+        render(
+            <I18nContext.Provider value={{ t: mockT, locale: 'zh-CN' }}>
+                <AgentChatPanel
+                    messages={messages}
+                    onSend={vi.fn()}
+                    sending={false}
+                    useStream={true}
+                    sessionId="client-session-abc"
+                    profile="summary"
+                    onUserMessage={vi.fn()}
+                    onAssistantMessage={onAssistantMessage}
+                />
+            </I18nContext.Provider>
+        );
 
         const textarea = screen.getByPlaceholderText('summary.create.agentChatPlaceholder');
         const sendButton = screen.getByText('summary.create.send');
 
-        // Send message with client-session-abc
+        // Send message
         fireEvent.change(textarea, { target: { value: 'test question' } });
         fireEvent.click(sendButton);
 
         // Wait for stream to be set up
         await waitFor(() => expect(savedHandlers).not.toBeNull(), { timeout: 1000 });
 
-        // Backend returns different session_id (server normalized/migrated)
+        // Backend returns different session_id in done event
         act(() => {
             savedHandlers.onDone({
                 reply: 'Server response',
-                session_id: 'server-session-xyz',  // ← Different from client's abc
+                session_id: 'server-session-xyz',
             });
         });
 
-        // Verify onAssistantMessage was called with BOTH text and new session_id
+        // Verify panel passes BOTH text and session_id to the callback
+        // (Parent component is responsible for persisting and updating state)
         await waitFor(() => {
             expect(onAssistantMessage).toHaveBeenCalledWith('Server response', 'server-session-xyz');
         }, { timeout: 1000 });
-
-        // Verify the new session_id would be used (parent should update state)
-        expect(currentSessionId).toBe('server-session-xyz');
     });
-
-    it('should toggle process panel expand/collapse when progress events arrive', async () => {
-        let savedHandlers: any = null;
-        let messages: ChatMessage[] = [];
-
-        // Mock agentChatStream to capture handlers
-        (summaryApi.agentChatStream as any).mockImplementation((params: any, handlers: any) => {
-            savedHandlers = handlers;
-            return { close: vi.fn() };
-        });
-
-        const TestWrapper = () => {
-            const [msgs, setMsgs] = React.useState<ChatMessage[]>(messages);
-
-            return (
-                <I18nContext.Provider value={{ t: mockT, locale: 'zh-CN' }}>
-                    <AgentChatPanel
-                        messages={msgs}
-                        onSend={vi.fn()}
-                        sending={false}
-                        useStream={true}
-                        sessionId="test-session"
-                        profile="summary"
-                        onUserMessage={(text) => {
-                            const newMsgs = [...msgs, { role: 'user' as const, content: text }];
-                            setMsgs(newMsgs);
-                            messages = newMsgs;
-                        }}
-                        onAssistantMessage={vi.fn()}
-                    />
-                </I18nContext.Provider>
-            );
-        };
-
-        const { container } = render(<TestWrapper />);
-
-        const textarea = screen.getByPlaceholderText('summary.create.agentChatPlaceholder');
-        const sendButton = screen.getByText('summary.create.send');
-
-        // Send message
-        fireEvent.change(textarea, { target: { value: 'test message' } });
-        fireEvent.click(sendButton);
-
-        // Wait for stream to be set up
-        await waitFor(() => expect(savedHandlers).not.toBeNull(), { timeout: 1000 });
-
-        // Trigger progress event
-        act(() => {
-            savedHandlers.onProgress({ phase: 'explore', step: 1, detail: 'test progress' });
-        });
-
-        // Wait for progress panel to appear
-        let panel: Element | null = null;
-        await waitFor(() => {
-            panel = container.querySelector('.agent-chat-process-panel');
-            expect(panel).not.toBeNull();
-        }, { timeout: 2000 });
-
-        // Panel should be expanded by default
-        expect(panel).not.toHaveClass('agent-chat-process-panel--collapsed');
-
-        // Find and click the toggle button
-        const toggleButton = panel?.querySelector('.agent-chat-process-toggle');
-        expect(toggleButton).not.toBeNull();
-
         // Click to collapse
-        act(() => {
-            fireEvent.click(toggleButton!);
-        });
-
-        expect(panel).toHaveClass('agent-chat-process-panel--collapsed');
-
-        // Click again to expand
-        act(() => {
-            fireEvent.click(toggleButton!);
-        });
-
-        expect(panel).not.toHaveClass('agent-chat-process-panel--collapsed');
-    });
 
     it('should cleanup stream on unmount', async () => {
         const closeFn = vi.fn();

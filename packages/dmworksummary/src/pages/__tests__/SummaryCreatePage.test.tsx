@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SummaryCreatePage from '../SummaryCreatePage';
 import * as api from '../../api/summaryApi';
 
+import * as summaryHelpers from '../../utils/summaryHelpers';
 vi.mock('@douyinfe/semi-ui', () => ({
     Button: ({ children, onClick, disabled, loading, theme, icon, ...rest }: any) => (
         <button onClick={onClick} disabled={disabled} data-loading={loading} data-theme={theme} {...rest}>
@@ -383,5 +384,121 @@ describe('SummaryCreatePage agent session_id persistence + history rehydrate + n
         const newSid = localStorage.getItem(WORKBENCH_KEY);
         expect(newSid).toBeTruthy();
         expect(newSid).toMatch(UUID_RE);
+    });
+});
+
+
+
+describe('SummaryCreatePage agent SSE session_id sync', () => {
+    let writeSessionSpy: any;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        // Spy on the actual writeAgentChatSession from summaryHelpers
+        writeSessionSpy = vi.spyOn(summaryHelpers, 'writeAgentChatSession').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        writeSessionSpy?.mockRestore();
+    });
+
+    it('updates sessionId and persists when backend returns different session_id', async () => {
+        const ref = React.createRef<SummaryCreatePage>();
+        await act(async () => {
+            render(<SummaryCreatePage ref={ref} />);
+            await flushPromises();
+        });
+
+        const instance = ref.current as any;
+        
+        // Set initial state with client session
+        await act(async () => {
+            instance.setState({ sessionId: 'client-session-abc', mode: 'agent' });
+        });
+
+        // Simulate SSE onDone calling handleAgentAssistantMessage with different session_id
+        await act(async () => {
+            instance.handleAgentAssistantMessage('Server response', 'server-session-xyz');
+            await flushPromises();
+        });
+
+        // Verify writeAgentChatSession was called with the NEW session_id
+        expect(writeSessionSpy).toHaveBeenCalledWith(undefined, 'server-session-xyz');
+        
+        // Verify state was updated to the NEW session_id
+        expect(instance.state.sessionId).toBe('server-session-xyz');
+        
+        // Verify assistant message was added
+        const lastMessage = instance.state.messages[instance.state.messages.length - 1];
+        expect(lastMessage.role).toBe('assistant');
+        expect(lastMessage.content).toBe('Server response');
+    });
+
+    it('does not persist when backend returns same session_id', async () => {
+        const ref = React.createRef<SummaryCreatePage>();
+        await act(async () => {
+            render(<SummaryCreatePage ref={ref} />);
+            await flushPromises();
+        });
+
+        const instance = ref.current as any;
+        
+        // Set initial state with session
+        await act(async () => {
+            instance.setState({ sessionId: 'same-session-id', mode: 'agent' });
+        });
+
+        writeSessionSpy.mockClear();
+
+        // Simulate SSE onDone calling handleAgentAssistantMessage with SAME session_id
+        await act(async () => {
+            instance.handleAgentAssistantMessage('Server response', 'same-session-id');
+            await flushPromises();
+        });
+
+        // Verify writeAgentChatSession was NOT called (no need to persist same value)
+        expect(writeSessionSpy).not.toHaveBeenCalled();
+        
+        // Verify state sessionId remained unchanged
+        expect(instance.state.sessionId).toBe('same-session-id');
+        
+        // Verify assistant message was still added
+        const lastMessage = instance.state.messages[instance.state.messages.length - 1];
+        expect(lastMessage.role).toBe('assistant');
+        expect(lastMessage.content).toBe('Server response');
+    });
+
+    it('does not persist when backend returns undefined session_id', async () => {
+        const ref = React.createRef<SummaryCreatePage>();
+        await act(async () => {
+            render(<SummaryCreatePage ref={ref} />);
+            await flushPromises();
+        });
+
+        const instance = ref.current as any;
+        
+        // Set initial state with session
+        await act(async () => {
+            instance.setState({ sessionId: 'current-session-id', mode: 'agent' });
+        });
+
+        writeSessionSpy.mockClear();
+
+        // Simulate SSE onDone calling handleAgentAssistantMessage without session_id
+        await act(async () => {
+            instance.handleAgentAssistantMessage('Server response', undefined);
+            await flushPromises();
+        });
+
+        // Verify writeAgentChatSession was NOT called
+        expect(writeSessionSpy).not.toHaveBeenCalled();
+        
+        // Verify state sessionId remained unchanged
+        expect(instance.state.sessionId).toBe('current-session-id');
+        
+        // Verify assistant message was still added
+        const lastMessage = instance.state.messages[instance.state.messages.length - 1];
+        expect(lastMessage.role).toBe('assistant');
+        expect(lastMessage.content).toBe('Server response');
     });
 });
