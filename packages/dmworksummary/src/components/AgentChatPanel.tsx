@@ -115,7 +115,7 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
         try {
             const { close } = agentChatStream({
                 session_id: sessionId,
-                question: text,
+                message: text,
                 profile,
             }, {
                 onProgress: (evt: AgentProgressEvent) => {
@@ -132,7 +132,7 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                     }));
                 },
                 onDone: (evt: AgentDoneEvent) => {
-                    const reply = evt.final_answer || '（无回复）';
+                    const reply = evt.reply || '（无回复）';
                     onAssistantMessage?.(reply);
                     this.setState({
                         isStreaming: false,
@@ -166,7 +166,7 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
         try {
             const result = await agentChat({
                 session_id: sessionId,
-                question: text,
+                message: text,
                 profile,
             });
             const reply = result.reply || '（无回复）';
