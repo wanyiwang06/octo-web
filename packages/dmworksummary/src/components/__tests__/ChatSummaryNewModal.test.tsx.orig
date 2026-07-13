@@ -75,7 +75,7 @@ vi.mock('../../utils/channelType', () => ({
 }));
 
 vi.mock('../../api/summaryApi', () => ({
-    getTopicTemplatesConfig: vi.fn().mockResolvedValue({ templates: [], custom_template_limit: 30 }),
+    getTopicTemplates: vi.fn().mockResolvedValue([]),
     createSummary: vi.fn().mockResolvedValue({ task_id: 1 }),
     agentChat: vi.fn(),
     getAgentChatHistory: vi.fn().mockResolvedValue({ session_id: '', messages: [] }),
@@ -235,7 +235,7 @@ describe('ChatSummaryNewModal', () => {
         expect(inputArea!.querySelector('.chat-summary-modal-templates')).not.toBeInTheDocument();
     });
 
-    it('parameterized template click fills the unified topic/context frame', async () => {
+    it('parameterized template click sets value with placeholder, then focus removes placeholder text', async () => {
         await act(async () => {
             render(<ChatSummaryNewModal {...defaultProps} />);
             await flushPromises();
@@ -245,13 +245,13 @@ describe('ChatSummaryNewModal', () => {
         fireEvent.click(templateCard);
 
         const input = screen.getByPlaceholderText('输入聊天内你想总结的主题') as HTMLTextAreaElement;
-        expect(input.value).toBe('总结主题: 汇总项目进展\n内容重点: 总结进展');
+        expect(input.value).toBe('总结 输入项目名称 的项目进展');
 
         await act(async () => {
             await flushPromises();
         });
 
-        expect(input.value).toBe('总结主题: 汇总项目进展\n内容重点: 总结进展');
+        expect(input.value).toBe('总结  的项目进展');
     });
 
     it('fixed template click does not set placeholder range', async () => {
@@ -267,14 +267,14 @@ describe('ChatSummaryNewModal', () => {
         });
 
         const input = screen.getByPlaceholderText('输入聊天内你想总结的主题') as HTMLTextAreaElement;
-        expect(input.value).toBe('总结主题: 总结团队周报\n内容重点: 总结工作');
+        expect(input.value).toBe('总结每周的工作周报');
 
         await act(async () => {
             fireEvent.focus(input);
             await flushPromises();
         });
 
-        expect(input.value).toBe('总结主题: 总结团队周报\n内容重点: 总结工作');
+        expect(input.value).toBe('总结每周的工作周报');
     });
 
     it('onChange clears placeholder range so subsequent focus does not remove text', async () => {
@@ -532,7 +532,7 @@ describe('ChatSummaryNewModal agent SSE session_id sync', () => {
     it('updates sessionId and persists when backend returns different session_id', async () => {
         const ref = React.createRef<ChatSummaryNewModal>();
         await act(async () => {
-            render(<ChatSummaryNewModal ref={ref} channel={{channelID: 'ch-123', channelType: 2}} visible={true} onClose={vi.fn()} onSubmit={vi.fn()} />);
+            render(<ChatSummaryNewModal ref={ref} channelId="ch-123" visible={true} onOk={vi.fn()} onCancel={vi.fn()} />);
             await flushPromises();
         });
 
@@ -564,7 +564,7 @@ describe('ChatSummaryNewModal agent SSE session_id sync', () => {
     it('does not persist when backend returns same session_id', async () => {
         const ref = React.createRef<ChatSummaryNewModal>();
         await act(async () => {
-            render(<ChatSummaryNewModal ref={ref} channel={{channelID: 'ch-123', channelType: 2}} visible={true} onClose={vi.fn()} onSubmit={vi.fn()} />);
+            render(<ChatSummaryNewModal ref={ref} channelId="ch-123" visible={true} onOk={vi.fn()} onCancel={vi.fn()} />);
             await flushPromises();
         });
 
@@ -598,7 +598,7 @@ describe('ChatSummaryNewModal agent SSE session_id sync', () => {
     it('does not persist when backend returns undefined session_id', async () => {
         const ref = React.createRef<ChatSummaryNewModal>();
         await act(async () => {
-            render(<ChatSummaryNewModal ref={ref} channel={{channelID: 'ch-123', channelType: 2}} visible={true} onClose={vi.fn()} onSubmit={vi.fn()} />);
+            render(<ChatSummaryNewModal ref={ref} channelId="ch-123" visible={true} onOk={vi.fn()} onCancel={vi.fn()} />);
             await flushPromises();
         });
 
