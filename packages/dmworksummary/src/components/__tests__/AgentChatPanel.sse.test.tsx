@@ -189,6 +189,82 @@ describe('AgentChatPanel SSE Mode', () => {
         }, { timeout: 2000 });
     });
 
+    it('should update sessionId when backend returns different session_id', async () => {
+        let savedHandlers: any = null;
+        const onAssistantMessage = vi.fn();
+        const mockWriteSession = vi.fn();
+
+        // Mock writeAgentChatSession
+        vi.mock('../../utils/agentChatSession', () => ({
+            writeAgentChatSession: mockWriteSession,
+            readAgentChatSession: vi.fn(),
+            genSessionId: () => 'client-generated-id',
+        }));
+
+        // Mock agentChatStream to capture handlers
+        (summaryApi.agentChatStream as any).mockImplementation((params: any, handlers: any) => {
+            savedHandlers = handlers;
+            return { close: vi.fn() };
+        });
+
+        let messages: ChatMessage[] = [{ role: 'user' as const, content: 'test' }];
+        let currentSessionId = 'client-session-abc';
+
+        const TestWrapper = () => {
+            const [sessionId, setSessionId] = React.useState(currentSessionId);
+
+            return (
+                <I18nContext.Provider value={{ t: mockT, locale: 'zh-CN' }}>
+                    <AgentChatPanel
+                        messages={messages}
+                        onSend={vi.fn()}
+                        sending={false}
+                        useStream={true}
+                        sessionId={sessionId}
+                        profile="summary"
+                        onUserMessage={vi.fn()}
+                        onAssistantMessage={(text, newSessionId) => {
+                            onAssistantMessage(text, newSessionId);
+                            if (newSessionId && newSessionId !== sessionId) {
+                                // Simulate parent component behavior
+                                setSessionId(newSessionId);
+                                currentSessionId = newSessionId;
+                            }
+                        }}
+                    />
+                </I18nContext.Provider>
+            );
+        };
+
+        render(<TestWrapper />);
+
+        const textarea = screen.getByPlaceholderText('summary.create.agentChatPlaceholder');
+        const sendButton = screen.getByText('summary.create.send');
+
+        // Send message with client-session-abc
+        fireEvent.change(textarea, { target: { value: 'test question' } });
+        fireEvent.click(sendButton);
+
+        // Wait for stream to be set up
+        await waitFor(() => expect(savedHandlers).not.toBeNull(), { timeout: 1000 });
+
+        // Backend returns different session_id (server normalized/migrated)
+        act(() => {
+            savedHandlers.onDone({
+                reply: 'Server response',
+                session_id: 'server-session-xyz',  // ← Different from client's abc
+            });
+        });
+
+        // Verify onAssistantMessage was called with BOTH text and new session_id
+        await waitFor(() => {
+            expect(onAssistantMessage).toHaveBeenCalledWith('Server response', 'server-session-xyz');
+        }, { timeout: 1000 });
+
+        // Verify the new session_id would be used (parent should update state)
+        expect(currentSessionId).toBe('server-session-xyz');
+    });
+
     it('should toggle process panel expand/collapse when progress events arrive', async () => {
         let savedHandlers: any = null;
         let messages: ChatMessage[] = [];

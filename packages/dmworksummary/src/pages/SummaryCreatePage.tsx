@@ -493,10 +493,19 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
     };
 
     /** SSE 模式：追加 assistant 消息(仅 UI,不发请求)。 */
-    handleAgentAssistantMessage = (text: string) => {
-        this.setState((prev) => ({
-            messages: [...prev.messages, { role: 'assistant', content: text }],
-        }));
+    handleAgentAssistantMessage = (text: string, sessionId?: string) => {
+        // 后端回传 session_id 非空则回填并持久化（与后端持久化的会话保持一致）
+        if (sessionId && sessionId !== this.state.sessionId) {
+            writeAgentChatSession(this.agentChannelId(), sessionId);
+            this.setState((prev) => ({
+                messages: [...prev.messages, { role: 'assistant', content: text }],
+                sessionId,
+            }));
+        } else {
+            this.setState((prev) => ({
+                messages: [...prev.messages, { role: 'assistant', content: text }],
+            }));
+        }
     };
     handlePrimaryClick = () => {
         if (this.state.mode !== 'agent') {
