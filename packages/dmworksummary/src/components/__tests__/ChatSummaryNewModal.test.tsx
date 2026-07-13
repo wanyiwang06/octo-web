@@ -13,6 +13,7 @@ vi.mock('@douyinfe/semi-ui', () => ({
             </div>
         ) : null,
     Toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
+    Input: ({ value, onChange, ...rest }: any) => <input value={value} onChange={(e) => onChange?.(e.target.value)} {...rest} />,
     Tag: ({ children, closable, onClose }: any) => (
         <span data-testid="tag">
             {children}

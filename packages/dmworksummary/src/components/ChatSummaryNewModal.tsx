@@ -508,6 +508,8 @@ export default class ChatSummaryNewModal extends Component<
                             // 弹窗内高度受限：固定面板高度让内部消息列表滚动。
                             <div className="chat-summary-modal-agent-chat" style={{ height: 360 }}>
                                 <AgentChatPanel
+                                    sessionId={this.state.sessionId}
+                                    profile="summary"
                                     messages={messages}
                                     onSend={this.handleAgentSend}
                                     sending={agentSubmitting}

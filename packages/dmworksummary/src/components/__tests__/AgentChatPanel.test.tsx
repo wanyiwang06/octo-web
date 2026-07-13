@@ -233,6 +233,8 @@ describe('AgentChatPanel - Save as Summary', () => {
         expect(screen.getByTestId('save-modal')).toBeInTheDocument();
         // 标题应该保留
         expect(titleInput).toHaveValue('测试总结');
+    });
+});
 describe('AgentChatPanel 新会话 action', () => {
     it('不提供 onNewSession 时不渲染「新会话」按钮', () => {
         rtlRender(<AgentChatPanel messages={[]} onSend={vi.fn()} sending={false} />);

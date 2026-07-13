@@ -94,3 +94,89 @@
     background-color: var(--semi-color-disabled-fill);
     color: var(--semi-color-disabled-text);
 }
+
+/* ─── 过程面板样式 ────────────────────────────────────── */
+
+/* 过程面板容器 */
+.agent-chat-process-panel {
+    margin-top: var(--wk-sp-2, 8px);
+    padding: var(--wk-sp-2, 8px);
+    border-radius: var(--wk-r-sm, 8px);
+    background-color: var(--semi-color-fill-1);
+    border: 1px solid var(--semi-color-border);
+}
+
+/* 折叠状态 */
+.agent-chat-process-panel--collapsed {
+    padding: var(--wk-sp-1, 4px) var(--wk-sp-2, 8px);
+}
+
+/* 折叠/展开切换按钮 */
+.agent-chat-process-toggle {
+    background: none;
+    border: none;
+    color: var(--semi-color-primary);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0;
+    margin-bottom: var(--wk-sp-1, 4px);
+    text-align: left;
+}
+
+.agent-chat-process-toggle:hover {
+    text-decoration: underline;
+}
+
+/* 时间线容器 */
+.agent-chat-process-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wk-sp-1, 4px);
+    font-size: 13px;
+}
+
+/* 单条进度项 */
+.agent-chat-process-item {
+    color: var(--semi-color-text-1);
+    line-height: 18px;
+}
+
+/* 进度标签（加粗） */
+.agent-chat-process-label {
+    font-weight: 600;
+    color: var(--semi-color-text-0);
+}
+
+/* 进度详情 */
+.agent-chat-process-detail {
+    margin-left: var(--wk-sp-1, 4px);
+}
+
+/* 加载中项 */
+.agent-chat-process-item--loading {
+    display: flex;
+    align-items: center;
+    gap: var(--wk-sp-1, 4px);
+    color: var(--semi-color-text-2);
+    font-style: italic;
+}
+
+/* 转圈 spinner */
+.agent-chat-process-spinner {
+    display: inline-block;
+    animation: spin 1.5s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 元信息（底部灰色小字） */
+.agent-chat-process-meta {
+    margin-top: var(--wk-sp-2, 8px);
+    padding-top: var(--wk-sp-1, 4px);
+    border-top: 1px solid var(--semi-color-border);
+    font-size: 12px;
+    color: var(--semi-color-text-2);
+}
