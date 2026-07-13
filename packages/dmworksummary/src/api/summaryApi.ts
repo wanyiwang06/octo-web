@@ -392,6 +392,8 @@ export function agentChatStream(
             const decoder = new TextDecoder('utf-8');
             let buffer = '';
 
+            let pendingEvent = '';
+            let pendingData = '';
             while (!aborted) {
                 const { done, value } = await reader.read();
                 if (done) break;
@@ -400,21 +402,19 @@ export function agentChatStream(
                 const lines = buffer.split('\n');
                 buffer = lines.pop() || ''; // 最后一行可能不完整,留在 buffer
 
-                let currentEvent = '';
-                let currentData = '';
 
                 for (const line of lines) {
                     if (line.startsWith('event:')) {
-                        currentEvent = line.slice(6).trim();
+                        pendingEvent = line.slice(6).trim();
                     } else if (line.startsWith('data:')) {
-                        currentData = line.slice(5).trim();
+                        pendingData = line.slice(5).trim();
                     } else if (line === '') {
                         // 空行是帧边界,解析并分发
-                        if (currentEvent && currentData) {
-                            parseAndDispatch(currentEvent, currentData, handlers);
+                        if (pendingEvent && pendingData) {
+                            parseAndDispatch(pendingEvent, pendingData, handlers);
                         }
-                        currentEvent = '';
-                        currentData = '';
+                        pendingEvent = '';
+                        pendingData = '';
                     }
                 }
             }

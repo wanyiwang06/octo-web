@@ -490,6 +490,28 @@ export default class ChatSummaryNewModal extends Component<
         }
     };
 
+
+    /** SSE 模式：追加 user 消息(仅 UI,不发请求)。 */
+    private handleAgentUserMessage = (text: string) => {
+        const trimmed = text.trim();
+        if (!trimmed) return;
+        
+        // 惰性生成 session_id，整会话复用
+        const sessionId = this.state.sessionId || genSessionId();
+        writeAgentChatSession(this.agentChannelId(), sessionId);
+
+        this.setState((prev) => ({
+            messages: [...prev.messages, { role: 'user', content: trimmed }],
+            sessionId,
+        }));
+    };
+
+    /** SSE 模式：追加 assistant 消息(仅 UI,不发请求)。 */
+    private handleAgentAssistantMessage = (text: string) => {
+        this.setState((prev) => ({
+            messages: [...prev.messages, { role: 'assistant', content: text }],
+        }));
+    };
     /** 主按钮点击：normal 走普通提交；agent 输入走面板底部输入框，主按钮无需提交。 */
     private handlePrimaryClick = () => {
         if (this.state.mode !== 'agent') {
@@ -727,6 +749,9 @@ export default class ChatSummaryNewModal extends Component<
                             // 弹窗内高度受限：固定面板高度让内部消息列表滚动。
                             <div className="chat-summary-modal-agent-chat" style={{ height: 360 }}>
                                 <AgentChatPanel
+                                    useStream={true}
+                                    onUserMessage={this.handleAgentUserMessage}
+                                    onAssistantMessage={this.handleAgentAssistantMessage}
                                     sessionId={this.state.sessionId}
                                     profile="summary"
                                     messages={messages}

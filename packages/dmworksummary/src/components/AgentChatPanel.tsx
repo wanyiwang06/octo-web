@@ -2,7 +2,7 @@ import React, { Component, createRef } from 'react';
 import { Button, Modal, Input, Toast } from '@douyinfe/semi-ui';
 import { I18nContext } from '@octo/base';
 import type { ChatMessage, AgentProgressEvent, AgentDoneEvent, AgentErrorEvent } from '../types/summary';
-import { agentChatStream } from '../api/summaryApi';
+import { agentChatStream, agentChat } from '../api/summaryApi';
 import './AgentChatPanel.css';
 
 interface AgentChatPanelProps {
@@ -16,6 +16,8 @@ interface AgentChatPanelProps {
     useStream?: boolean;
     sessionId?: string;
     profile?: string;
+    onAssistantMessage?: (text: string) => void;
+    onUserMessage?: (text: string) => void;
 }
 
 interface ProgressStep {
@@ -92,7 +94,7 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
     };
 
     private startSSEStream = async (text: string) => {
-        const { sessionId, profile } = this.props;
+        const { sessionId, profile, onUserMessage, onAssistantMessage } = this.props;
         if (!sessionId || !profile) {
             console.error('[AgentChatPanel] useStream=true but missing sessionId/profile');
             Toast.error('SSE 模式需要 sessionId 和 profile');
@@ -107,13 +109,15 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
             streamStartTime: Date.now(),
         });
 
-        this.props.onSend(text);
+        // 先本地追加 user 消息(纯 UI,不发请求)
+        onUserMessage?.(text);
 
         try {
-            const { close } = await agentChatStream({
+            const { close } = agentChatStream({
                 session_id: sessionId,
                 question: text,
                 profile,
+            }, {
                 onProgress: (evt: AgentProgressEvent) => {
                     this.setState(prev => ({
                         progressSteps: [
@@ -129,7 +133,7 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                 },
                 onDone: (evt: AgentDoneEvent) => {
                     const reply = evt.final_answer || '（无回复）';
-                    this.props.onSend(reply);
+                    onAssistantMessage?.(reply);
                     this.setState({
                         isStreaming: false,
                         processExpanded: false,
@@ -158,16 +162,15 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
 
     private fallbackToNormalChat = async (text: string, sessionId: string, profile: string) => {
         const { t } = this.context;
+        const { onAssistantMessage } = this.props;
         try {
-            const res = await fetch('/summary/api/v1/agent/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text, session_id: sessionId, profile }),
+            const result = await agentChat({
+                session_id: sessionId,
+                question: text,
+                profile,
             });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            const reply = data.reply || '（无回复）';
-            this.props.onSend(reply);
+            const reply = result.reply || '（无回复）';
+            onAssistantMessage?.(reply);
         } catch (err: any) {
             Toast.error(t('summary.common.createFailed'));
             console.error('[AgentChatPanel] Fallback agentChat failed:', err);
@@ -231,7 +234,7 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                 
                 {processExpanded && (
                     <>
-                        <div className="agent-chat-process-timeline">
+                        <div className="agent-chat-process-timeline" aria-live="polite">
                             {progressSteps.map((step, i) => (
                                 <div key={i} className="agent-chat-process-item">
                                     <span className="agent-chat-process-label">

@@ -476,6 +476,28 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
     };
 
     /** 主按钮点击：normal 走普通提交；agent 输入走面板底部输入框，主按钮无需提交。 */
+
+    /** SSE 模式：追加 user 消息(仅 UI,不发请求)。 */
+    handleAgentUserMessage = (text: string) => {
+        const trimmed = text.trim();
+        if (!trimmed) return;
+        
+        // 惰性生成 session_id，整会话复用
+        const sessionId = this.state.sessionId || genSessionId();
+        writeAgentChatSession(this.agentChannelId(), sessionId);
+
+        this.setState((prev) => ({
+            messages: [...prev.messages, { role: 'user', content: trimmed }],
+            sessionId,
+        }));
+    };
+
+    /** SSE 模式：追加 assistant 消息(仅 UI,不发请求)。 */
+    handleAgentAssistantMessage = (text: string) => {
+        this.setState((prev) => ({
+            messages: [...prev.messages, { role: 'assistant', content: text }],
+        }));
+    };
     handlePrimaryClick = () => {
         if (this.state.mode !== 'agent') {
             void this.handleSubmit();
@@ -650,6 +672,9 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
                         // Agent 交互式问答：面板自带输入框，隐藏顶部大 textarea + 4 模板卡片。
                         <div className="summary-workbench-agent-chat">
                             <AgentChatPanel
+                                useStream={true}
+                                onUserMessage={this.handleAgentUserMessage}
+                                onAssistantMessage={this.handleAgentAssistantMessage}
                                 sessionId={this.state.sessionId}
                                 profile="summary"
                                 messages={messages}
