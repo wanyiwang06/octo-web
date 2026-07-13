@@ -167,7 +167,12 @@
     "titleRequired": "标题不能为空",
     "saving": "保存中...",
     "noOutputToSave": "当前对话还没有可保存的总结，请先与 AI 对话产出内容",
-    "agentSummaryCreated": "AI 总结已保存"
+    "agentSummaryCreated": "AI 总结已保存",
+    "generating": "生成中...",
+    "generationTime": "生成用时",
+    "stepsCount": "步",
+    "streamInterrupted": "过程流中断,已切换到普通模式",
+    "viewGenerationProcess": "查看生成过程"
   },
   "chatSummary": {
     "panelTitle": "聊天内的智能总结",

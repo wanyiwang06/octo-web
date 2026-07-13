@@ -276,6 +276,44 @@ export interface AgentChatHistory {
     messages: ChatMessage[];
 }
 
+/**
+ * Agent SSE 流式事件类型 — progress 事件（每步/每工具）
+ */
+export interface AgentProgressEvent {
+    phase: 'explore' | 'fetch' | 'filter' | 'map' | 'reduce' | 'other';
+    label: string;
+    detail: string;
+    step: number;
+    ofSteps: number;
+    tool: string;
+    elapsed_ms: number;
+}
+
+/**
+ * Agent SSE 流式事件类型 — done 事件（最后 1 条,收到就停）
+ */
+export interface AgentDoneEvent {
+    reply: string;
+    session_id: string;
+}
+
+/**
+ * Agent SSE 流式事件类型 — error 事件（任何环节都可能来）
+ */
+export interface AgentErrorEvent {
+    code: number;
+    message: string;
+}
+
+/**
+ * Agent SSE 流式消费 handlers
+ */
+export interface AgentStreamHandlers {
+    onProgress?: (event: AgentProgressEvent) => void;
+    onDone?: (event: AgentDoneEvent) => void;
+    onError?: (event: AgentErrorEvent) => void;
+}
+
 /** 列表查询参数 */
 export interface ListSummariesParams {
     page?: number;

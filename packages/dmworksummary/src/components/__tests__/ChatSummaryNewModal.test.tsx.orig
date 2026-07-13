@@ -532,7 +532,7 @@ describe('ChatSummaryNewModal agent SSE session_id sync', () => {
     it('updates sessionId and persists when backend returns different session_id', async () => {
         const ref = React.createRef<ChatSummaryNewModal>();
         await act(async () => {
-            render(<ChatSummaryNewModal ref={ref} channel={{channelID: 'ch-123', channelType: 2}} visible={true} onClose={vi.fn()} onSubmit={vi.fn()} />);
+            render(<ChatSummaryNewModal ref={ref} channelId="ch-123" visible={true} onOk={vi.fn()} onCancel={vi.fn()} />);
             await flushPromises();
         });
 
@@ -564,7 +564,7 @@ describe('ChatSummaryNewModal agent SSE session_id sync', () => {
     it('does not persist when backend returns same session_id', async () => {
         const ref = React.createRef<ChatSummaryNewModal>();
         await act(async () => {
-            render(<ChatSummaryNewModal ref={ref} channel={{channelID: 'ch-123', channelType: 2}} visible={true} onClose={vi.fn()} onSubmit={vi.fn()} />);
+            render(<ChatSummaryNewModal ref={ref} channelId="ch-123" visible={true} onOk={vi.fn()} onCancel={vi.fn()} />);
             await flushPromises();
         });
 
@@ -598,7 +598,7 @@ describe('ChatSummaryNewModal agent SSE session_id sync', () => {
     it('does not persist when backend returns undefined session_id', async () => {
         const ref = React.createRef<ChatSummaryNewModal>();
         await act(async () => {
-            render(<ChatSummaryNewModal ref={ref} channel={{channelID: 'ch-123', channelType: 2}} visible={true} onClose={vi.fn()} onSubmit={vi.fn()} />);
+            render(<ChatSummaryNewModal ref={ref} channelId="ch-123" visible={true} onOk={vi.fn()} onCancel={vi.fn()} />);
             await flushPromises();
         });
 

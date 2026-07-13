@@ -167,7 +167,12 @@
     "titleRequired": "Title is required",
     "saving": "Saving...",
     "noOutputToSave": "No summary content to save yet. Please chat with AI first to generate content.",
-    "agentSummaryCreated": "AI summary saved"
+    "agentSummaryCreated": "AI summary saved",
+    "generating": "Generating...",
+    "generationTime": "Generation Time",
+    "stepsCount": "Steps",
+    "streamInterrupted": "Stream interrupted, switched to normal mode",
+    "viewGenerationProcess": "View Generation Process"
   },
   "chatSummary": {
     "panelTitle": "Summaries in this chat",
