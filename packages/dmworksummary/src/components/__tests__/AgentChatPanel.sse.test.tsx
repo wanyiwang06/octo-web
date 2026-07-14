@@ -338,7 +338,6 @@ describe('AgentChatPanel SSE Mode', () => {
             expect(timeline).toHaveAttribute('aria-live', 'polite');
         }, { timeout: 2000 });
     });
-});
 
     it('should allow first send with empty sessionId and pass it to backend', async () => {
         const onUserMessage = vi.fn();
@@ -428,3 +427,4 @@ describe('AgentChatPanel SSE Mode', () => {
             vi.mocked(summaryApi.agentChatStream).mockReset();
         }
     });
+});
