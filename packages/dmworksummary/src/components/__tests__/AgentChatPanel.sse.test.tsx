@@ -160,7 +160,7 @@ describe('AgentChatPanel SSE Mode', () => {
 
         // Simulate progress
         act(() => {
-            savedHandlers.onProgress({ phase: 'explore', step: 1, detail: 'searching' });
+            savedHandlers.onProgress({ phase: 'understand', step: 1, ofSteps: 8, elapsed_ms: 0, count: 5 });
         });
 
         // Verify process panel is expanded during streaming
@@ -328,7 +328,7 @@ describe('AgentChatPanel SSE Mode', () => {
 
         // Trigger progress event to make panel appear
         act(() => {
-            savedHandlers.onProgress({ phase: 'explore', step: 1, detail: 'test progress' });
+            savedHandlers.onProgress({ phase: 'understand', step: 1, ofSteps: 8, elapsed_ms: 0 });
         });
 
         // Wait for timeline to appear and check aria-live

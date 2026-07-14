@@ -20,10 +20,24 @@ interface AgentChatPanelProps {
     onUserMessage?: (text: string) => void;
 }
 
+/**
+ * 抽象阶段 → 用户可见中文文案（前端持有措辞）。
+ * 与后端脱敏后的 phase 安全枚举一一对应；后端绝不下发原始工具名。
+ * 未知 phase 走兜底"处理中"。
+ */
+const PHASE_LABELS: Record<string, string> = {
+    understand: '正在理解需求',
+    retrieve: '正在检索聊天记录',
+    filter: '正在筛选相关内容',
+    distill: '正在分段提炼要点',
+    compose: '正在汇总生成总结',
+    reply: '正在生成回复',
+};
+
 interface ProgressStep {
     phase: string;
     step: number;
-    detail: string;
+    count?: number;
     timestamp: number;
 }
 
@@ -119,17 +133,32 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                 profile,
             }, {
                 onProgress: (evt: AgentProgressEvent) => {
-                    this.setState(prev => ({
-                        progressSteps: [
-                            ...prev.progressSteps,
-                            {
-                                phase: evt.phase,
+                    this.setState(prev => {
+                        const steps = prev.progressSteps;
+                        const last = steps[steps.length - 1];
+                        // 合并同一 phase 的连续事件为一行（保留最新的 step/count），
+                        // 呈现为干净的抽象阶段时间线，而非逐工具日志。
+                        if (last && last.phase === evt.phase) {
+                            const merged: ProgressStep = {
+                                ...last,
                                 step: evt.step,
-                                detail: evt.detail,
+                                count: evt.count ?? last.count,
                                 timestamp: Date.now(),
-                            },
-                        ],
-                    }));
+                            };
+                            return { progressSteps: [...steps.slice(0, -1), merged] };
+                        }
+                        return {
+                            progressSteps: [
+                                ...steps,
+                                {
+                                    phase: evt.phase,
+                                    step: evt.step,
+                                    count: evt.count,
+                                    timestamp: Date.now(),
+                                },
+                            ],
+                        };
+                    });
                 },
                 onDone: (evt: AgentDoneEvent) => {
                     const reply = evt.reply || '（无回复）';
@@ -235,9 +264,13 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                             {progressSteps.map((step, i) => (
                                 <div key={i} className="agent-chat-process-item">
                                     <span className="agent-chat-process-label">
-                                        {t(`summary.common.agentChat.progress.${step.phase}`) || step.phase}
+                                        {PHASE_LABELS[step.phase] || '处理中'}
                                     </span>
-                                    <span className="agent-chat-process-detail">: {step.detail}</span>
+                                    {step.count ? (
+                                        <span className="agent-chat-process-detail">
+                                            {` · 已处理 ${step.count} 条`}
+                                        </span>
+                                    ) : null}
                                 </div>
                             ))}
                             {isStreaming && (
