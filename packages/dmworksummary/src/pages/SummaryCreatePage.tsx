@@ -600,11 +600,12 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
      * 渲染 chat header 里的"引用总结"入口 + 已选引用卡片。
      * - 未选中: 显示一个「+ 引用总结」按钮
      * - 已选中: 显示引用卡片(标题 + task_id + ✕ 移除)
-     * - 首轮锁定: 若 messages 里已有 assistant 消息,卡片变只读(不显 ✕、按钮 disabled)
+     *
+     * 引用**全程可增减**(不再首轮锁定) —— 后端每轮都会重新拼引用进 system,
+     * 见 CHAT-REFERENCE-BASED-DESIGN-v1 多轮上下文修复。
      */
     private renderReferenceHeader = (translate: (k: string) => string): React.ReactNode => {
-        const { referencedTask, messages } = this.state;
-        const isLocked = messages.some(m => m.role === 'assistant');
+        const { referencedTask } = this.state;
 
         if (referencedTask) {
             return (
@@ -615,27 +616,21 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
                     <span className="summary-workbench-ref-card-title">
                         {referencedTask.title || `task_id=${referencedTask.task_id}`}
                     </span>
-                    {!isLocked && (
-                        <span
-                            className="summary-workbench-ref-card-remove"
-                            onClick={() => this.setState({ referencedTask: null })}
-                            title={translate('summary.chatReference.remove')}
-                        >
-                            ✕
-                        </span>
-                    )}
+                    <span
+                        className="summary-workbench-ref-card-remove"
+                        onClick={() => this.setState({ referencedTask: null })}
+                        title={translate('summary.chatReference.remove')}
+                    >
+                        ✕
+                    </span>
                 </div>
             );
         }
         return (
             <span
-                className={`summary-workbench-ref-btn ${isLocked ? 'summary-workbench-ref-btn--disabled' : ''}`}
-                onClick={() => !isLocked && this.setState({ showReferencePicker: true })}
-                title={
-                    isLocked
-                        ? translate('summary.chatReference.lockedHint')
-                        : translate('summary.chatReference.buttonTip')
-                }
+                className="summary-workbench-ref-btn"
+                onClick={() => this.setState({ showReferencePicker: true })}
+                title={translate('summary.chatReference.buttonTip')}
             >
                 📎 {translate('summary.chatReference.button')}
             </span>

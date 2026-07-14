@@ -535,7 +535,6 @@
     "empty": "No summaries available to reference",
     "button": "Reference summary",
     "buttonTip": "Click to reference an existing summary",
-    "lockedHint": "Reference is locked after the first turn",
     "badge": "Referenced",
     "remove": "Remove reference"
   }
