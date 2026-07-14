@@ -3,6 +3,7 @@ import { Button, Modal, Input, Toast } from '@douyinfe/semi-ui';
 import { I18nContext } from '@octo/base';
 import type { ChatMessage, AgentProgressEvent, AgentDoneEvent, AgentErrorEvent } from '../types/summary';
 import { agentChatStream, agentChat } from '../api/summaryApi';
+import { genSessionId } from '../utils/summaryHelpers';
 import './AgentChatPanel.css';
 
 interface AgentChatPanelProps {
@@ -18,6 +19,16 @@ interface AgentChatPanelProps {
     profile?: string;
     onAssistantMessage?: (text: string, sessionId?: string) => void;
     onUserMessage?: (text: string) => void;
+    /**
+     * 引用的已有总结 task_id 列表。仅在**首轮**(messages.length===0)时随
+     * 第一个 chat 请求发给后端;后续轮次此字段被忽略(引用一次锁定)。
+     */
+    referencedTaskIds?: number[];
+    /**
+     * 引用锁定后由 header/入口渲染的可视化元素(如"已引用总结 A"卡片)。
+     * 传入即渲染在顶部标题栏(newSession 按钮同排);为 null 或不传时不渲染。
+     */
+    referenceHeader?: React.ReactNode;
 }
 
 interface ProgressStep {
@@ -94,12 +105,19 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
     };
 
     private startSSEStream = async (text: string) => {
-        const { sessionId, profile, onUserMessage, onAssistantMessage } = this.props;
+        const { sessionId: propsSessionId, profile, onUserMessage, onAssistantMessage } = this.props;
         if (!profile) {
             console.error('[AgentChatPanel] useStream=true but missing profile');
             Toast.error('SSE 模式需要 profile');
             return;
         }
+
+        // Bug fix: props.sessionId 可能是空字符串(父组件的 setState 是异步的,
+        // 首次交互时父组件从 onUserMessage 生成的新 sessionId 在同一 render
+        // cycle 里还未 propagate 到本组件)。这里本地兜底一次生成,同时通过
+        // onAssistantMessage 的 sessionId 参数上抛让父组件同步持久化。
+        // 见 CHAT-REFERENCE-BASED-DESIGN-v1: chat session 生命周期。
+        const sessionId = propsSessionId || genSessionId();
 
         this.setState({
             input: '',
@@ -113,10 +131,18 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
         onUserMessage?.(text);
 
         try {
+            // 引用只在首轮(还没落 assistant 消息前)才传给后端;后续轮次后端会忽略。
+            // 判断"首轮":当前 messages 数组里没有 assistant 消息 = 还没跑过第一轮。
+            const isFirstTurn = !this.props.messages.some(m => m.role === 'assistant');
+            const refIds = isFirstTurn && this.props.referencedTaskIds && this.props.referencedTaskIds.length > 0
+                ? this.props.referencedTaskIds
+                : undefined;
+
             const { close } = agentChatStream({
                 session_id: sessionId,
                 message: text,
                 profile,
+                referenced_task_ids: refIds,
             }, {
                 onProgress: (evt: AgentProgressEvent) => {
                     this.setState(prev => ({
@@ -133,7 +159,9 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
                 },
                 onDone: (evt: AgentDoneEvent) => {
                     const reply = evt.reply || '（无回复）';
-                    onAssistantMessage?.(reply, evt.session_id);
+                    // 优先用后端回传的 session_id(它可能对老 session 做过 canonicalize);
+                    // 兜底用我们本地生成的 sessionId(和请求时发出去的一致,父组件据此持久化)。
+                    onAssistantMessage?.(reply, evt.session_id || sessionId);
                     this.setState({
                         isStreaming: false,
                         processExpanded: false,
@@ -161,13 +189,20 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
         const { t } = this.context;
         const { onAssistantMessage } = this.props;
         try {
+            const isFirstTurn = !this.props.messages.some(m => m.role === 'assistant');
+            const refIds = isFirstTurn && this.props.referencedTaskIds && this.props.referencedTaskIds.length > 0
+                ? this.props.referencedTaskIds
+                : undefined;
+
             const result = await agentChat({
                 session_id: sessionId,
                 message: text,
                 profile,
+                referenced_task_ids: refIds,
             });
             const reply = result.reply || '（无回复）';
-            onAssistantMessage?.(reply);
+            // 上抛 sessionId 让父组件持久化(和 SSE onDone 一致)
+            onAssistantMessage?.(reply, result.session_id || sessionId);
         } catch (err: any) {
             Toast.error(t('summary.common.createFailed'));
             console.error('[AgentChatPanel] Fallback agentChat failed:', err);
@@ -257,7 +292,7 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
     };
 
     render() {
-        const { messages, sending, welcome, savingSummary, onNewSession } = this.props;
+        const { messages, sending, welcome, savingSummary, onNewSession, referenceHeader } = this.props;
         const { input, showSaveDialog, summaryTitle, isStreaming } = this.state;
         const { t } = this.context;
         const canSave = this.hasAssistantOutput() && this.props.onSaveAsSummary;
@@ -266,16 +301,19 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
 
         return (
             <div className="agent-chat-panel">
-                {onNewSession && (
+                {(onNewSession || referenceHeader) && (
                     <div className="agent-chat-panel-header">
-                        <Button
-                            theme="borderless"
-                            size="small"
-                            disabled={isBusy}
-                            onClick={onNewSession}
-                        >
-                            {t('summary.create.newSession')}
-                        </Button>
+                        {referenceHeader}
+                        {onNewSession && (
+                            <Button
+                                theme="borderless"
+                                size="small"
+                                disabled={isBusy}
+                                onClick={onNewSession}
+                            >
+                                {t('summary.create.newSession')}
+                            </Button>
+                        )}
                     </div>
                 )}
                 <div className="agent-chat-panel-list" ref={this.listRef}>
