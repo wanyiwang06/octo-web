@@ -487,7 +487,8 @@
     "refineNotSupported": "本总结不支持增量修改",
     "refineNotCreator": "你不是本总结的创建者，无法修改",
     "refineNoSnapshot": "本总结数据版本较老，无法增量修改",
-    "refineFailed": "修改失败，请稍后重试"
+    "refineFailed": "修改失败，请稍后重试",
+    "continueRefine": "继续优化"
   },
   "summaryCard": {
     "createdBy": "{{name}} 发起",
@@ -527,5 +528,15 @@
   },
   "splitMessage": {
     "signature": "---\n_by Octo 智能总结_"
+  },
+  "chatReference": {
+    "pickerTitle": "选择要引用的总结",
+    "searchPlaceholder": "搜索总结标题",
+    "empty": "还没有可引用的总结",
+    "button": "引用总结",
+    "buttonTip": "点击选择一份已有总结作为参考",
+    "lockedHint": "首轮对话后引用已锁定",
+    "badge": "已引用",
+    "remove": "移除引用"
   }
 }

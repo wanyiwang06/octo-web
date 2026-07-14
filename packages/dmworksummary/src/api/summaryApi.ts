@@ -700,18 +700,8 @@ export async function removeMember(taskId: number, uid: string): Promise<void> {
 }
 
 
-/**
- * Agent 总结增量修改（需求2 P2）。
- * 
- * POST /summary/api/v1/summaries/{task_id}/refine
- * 向已完成的 agent 生成总结提交修改需求，后端基于原快照增量修改并返回新版本。
- */
-export async function refineAgentSummary(
-    taskId: number,
-    instruction: string,
-): Promise<{ task_id: number; new_version: number; content: string; citations?: CitationItem[] }> {
-    return post(`/summaries/${taskId}/refine`, { instruction });
-}
+// refineAgentSummary 已移除 — 反馈修改改为在智能总结 chat 里引用总结迭代
+// (见 CHAT-REFERENCE-BASED-DESIGN-v1)。后端 POST /summaries/:id/refine 端点也已删除。
 
 // ─── Status Management ─────────────────────────────────
 

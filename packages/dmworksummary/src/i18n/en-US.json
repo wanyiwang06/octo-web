@@ -487,7 +487,8 @@
     "refineNotSupported": "This summary does not support refinement",
     "refineNotCreator": "You are not the creator of this summary and cannot modify it",
     "refineNoSnapshot": "This summary data version is too old and cannot be refined",
-    "refineFailed": "Refinement failed, please try again later"
+    "refineFailed": "Refinement failed, please try again later",
+    "continueRefine": "Continue refining"
   },
   "summaryCard": {
     "createdBy": "Created by {{name}}",
@@ -527,5 +528,15 @@
   },
   "splitMessage": {
     "signature": "---\n_by Octo AI Summary_"
+  },
+  "chatReference": {
+    "pickerTitle": "Reference a summary",
+    "searchPlaceholder": "Search summary titles",
+    "empty": "No summaries available to reference",
+    "button": "Reference summary",
+    "buttonTip": "Click to reference an existing summary",
+    "lockedHint": "Reference is locked after the first turn",
+    "badge": "Referenced",
+    "remove": "Remove reference"
   }
 }

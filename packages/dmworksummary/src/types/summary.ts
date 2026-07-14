@@ -265,6 +265,12 @@ export interface CreateAgentSummaryParams {
     sources?: SourceItem[];
     /** 可选参与者(沿用传统结构) */
     participants?: { user_id: string; user_name?: string }[];
+    /**
+     * 可选:本次 agent chat 首轮引用的已有总结 task_id 数组。
+     * 后端记录到 SummaryTask.referenced_task_ids 供衍生关系追溯。
+     * 见 CHAT-REFERENCE-BASED-DESIGN-v1。
+     */
+    referenced_task_ids?: number[];
 }
 
 /** Agent 对话单条消息（user 右气泡 / assistant 左气泡） */
@@ -280,6 +286,12 @@ export interface AgentChatParams {
     session_id: string;
     /** 指定后端 agent profile；总结场景传 'summary' 以挂载频道/消息等真实工具。 */
     profile?: string;
+    /**
+     * 引用的已有总结 task_id 列表。仅在**首轮**(该 session 的 history 为空时)生效:
+     * 后端会 fetch 每个 task 的最新产物 + 快照,作为 system message 的附录喂给 agent。
+     * 后续轮次此字段被忽略(引用一次锁定)。见 CHAT-REFERENCE-BASED-DESIGN-v1。
+     */
+    referenced_task_ids?: number[];
 }
 
 /** Agent 对话响应（post() 已解包 data） */

@@ -23,6 +23,7 @@ import MemberSelectorModal from "../components/MemberSelectorModal";
 import ScheduleConfigModal from "../components/ScheduleConfigModal";
 import TemplateCard from "../components/TemplateCard";
 import AgentChatPanel from "../components/AgentChatPanel";
+import SummaryReferencePicker from "../components/SummaryReferencePicker";
 import { TOPIC_TEMPLATES } from "../constants/templates";
 import { MAX_CHAT_SELECT } from "../constants/limits";
 import type {
@@ -32,6 +33,8 @@ import type {
     MemberCandidate,
     ScheduleConfig,
     TopicTemplate,
+    SummaryListItem,
+    CreateAgentSummaryParams,
 } from "../types/summary";
 import { SummaryMode, SourceType } from "../types/summary";
 import { describeSchedule, scheduleToParams, genSessionId, readAgentChatSession, writeAgentChatSession, clearAgentChatSession } from "../utils/summaryHelpers";
@@ -41,6 +44,13 @@ const { Text } = Typography;
 
 interface SummaryCreatePageProps {
     onCreated?: () => void;
+    /**
+     * 从详情页「继续优化」入口打开时,预填的引用总结。
+     * mount 时会自动切到 agent 模式 + 把此 task 填进 referencedTask,
+     * 达到"用户手动打开 chat + 手动引用"的完成态。
+     * 见 CHAT-REFERENCE-BASED-DESIGN-v1。
+     */
+    derivedFromTask?: SummaryListItem;
 }
 
 interface SummaryCreatePageState {
@@ -63,6 +73,13 @@ interface SummaryCreatePageState {
     // Agent 多轮问答：气泡 UI + session_id。后端按 session_id 持久化记忆，同一会话复用即可续上下文。
     messages: ChatMessage[];
     sessionId: string;
+    /**
+     * chat 引用的已有总结(单选,v1)。仅首轮生效,选中后随 first message 发给后端。
+     * 见 CHAT-REFERENCE-BASED-DESIGN-v1。
+     */
+    referencedTask: SummaryListItem | null;
+    /** 引用选择器 Modal 打开状态 */
+    showReferencePicker: boolean;
     error: string | null;
     editingTemplate: TopicTemplate | null;
     creatingCustomTemplate: boolean;
@@ -96,6 +113,8 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
         savingSummary: false,
         messages: [],
         sessionId: '',
+        referencedTask: null,
+        showReferencePicker: false,
         error: null,
         editingTemplate: null,
         creatingCustomTemplate: false,
@@ -118,6 +137,14 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
 
     componentDidMount() {
         void this.loadTemplates();
+        // 从详情页「继续优化」打开时:自动切 agent 模式 + 预填引用。
+        // 见 CHAT-REFERENCE-BASED-DESIGN-v1 决策 1B(详情页显眼按钮入口)。
+        if (this.props.derivedFromTask) {
+            this.setState({
+                mode: 'agent',
+                referencedTask: this.props.derivedFromTask,
+            });
+        }
     }
 
     private async loadTemplates() {
@@ -560,7 +587,59 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
         clearAgentChatSession(this.agentChannelId());
         // 作废在途历史拉取，避免旧会话历史回灌到新会话。
         this.historyLoadToken++;
-        this.setState({ messages: [], sessionId: '', error: null });
+        this.setState({
+            messages: [],
+            sessionId: '',
+            referencedTask: null,
+            showReferencePicker: false,
+            error: null,
+        });
+    };
+
+    /**
+     * 渲染 chat header 里的"引用总结"入口 + 已选引用卡片。
+     * - 未选中: 显示一个「+ 引用总结」按钮
+     * - 已选中: 显示引用卡片(标题 + task_id + ✕ 移除)
+     * - 首轮锁定: 若 messages 里已有 assistant 消息,卡片变只读(不显 ✕、按钮 disabled)
+     */
+    private renderReferenceHeader = (translate: (k: string) => string): React.ReactNode => {
+        const { referencedTask, messages } = this.state;
+        const isLocked = messages.some(m => m.role === 'assistant');
+
+        if (referencedTask) {
+            return (
+                <div className="summary-workbench-ref-card">
+                    <span className="summary-workbench-ref-card-label">
+                        {translate('summary.chatReference.badge')}
+                    </span>
+                    <span className="summary-workbench-ref-card-title">
+                        {referencedTask.title || `task_id=${referencedTask.task_id}`}
+                    </span>
+                    {!isLocked && (
+                        <span
+                            className="summary-workbench-ref-card-remove"
+                            onClick={() => this.setState({ referencedTask: null })}
+                            title={translate('summary.chatReference.remove')}
+                        >
+                            ✕
+                        </span>
+                    )}
+                </div>
+            );
+        }
+        return (
+            <span
+                className={`summary-workbench-ref-btn ${isLocked ? 'summary-workbench-ref-btn--disabled' : ''}`}
+                onClick={() => !isLocked && this.setState({ showReferencePicker: true })}
+                title={
+                    isLocked
+                        ? translate('summary.chatReference.lockedHint')
+                        : translate('summary.chatReference.buttonTip')
+                }
+            >
+                📎 {translate('summary.chatReference.button')}
+            </span>
+        );
     };
 
     /** 保存为总结（agent 模式）。将当前 session 的产出落库为可检索的交付物。返回成功/失败。 */
@@ -579,7 +658,7 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
             // session 的 tool_calls 反查 agent 实际读过的第一个 channel_id 作为
             // origin(见 handler/agent_summary.go)。整页入口 currentChannel 一定
             // 是 undefined,弹窗入口也不再依赖 channel prop,统一走后端反查。
-            const params: api.CreateAgentSummaryParams = {
+            const params: CreateAgentSummaryParams = {
                 session_id: sessionId,
                 title,
             };
@@ -600,9 +679,29 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
                 }));
             }
 
+            // 引用总结:如果用户在 chat 首轮引用了已有总结,把 task_id 附带过去,
+            // 后端会记录到 SummaryTask.referenced_task_ids 供未来做衍生关系追溯。
+            // 见 CHAT-REFERENCE-BASED-DESIGN-v1。
+            if (this.state.referencedTask) {
+                params.referenced_task_ids = [this.state.referencedTask.task_id];
+            }
+
             const result = await api.createAgentSummary(params);
 
             Toast.success(t('summary.create.agentSummaryCreated'));
+
+            // 保存成功 → 销毁 chat session 工作台:
+            //   1. 清 localStorage 里的 session_id(不然下次进 agent 会误恢复空 session)
+            //   2. 重置组件内 state(messages/sessionId/referencedTask)
+            //   3. 后端会在保存事务里 DELETE agent_message 表对应行
+            clearAgentChatSession(this.agentChannelId());
+            this.historyLoadToken++;
+            this.setState({
+                messages: [],
+                sessionId: '',
+                referencedTask: null,
+                showReferencePicker: false,
+            });
 
             // dispatch 刷新事件。agent 整页入口下前端已不再持有具体 channel
             // (origin 由后端从 tool_calls 反查),下游刷新监听按 taskId 走即可,
@@ -685,7 +784,7 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
                                 onUserMessage={this.handleAgentUserMessage}
                                 onAssistantMessage={this.handleAgentAssistantMessage}
                                 sessionId={this.state.sessionId}
-                                profile="summary"
+                                profile={this.state.referencedTask ? "summary_refine" : "summary"}
                                 messages={messages}
                                 onSend={this.handleAgentSend}
                                 sending={agentSubmitting}
@@ -693,6 +792,21 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
                                 onSaveAsSummary={this.handleSaveAsSummary}
                                 savingSummary={this.state.savingSummary}
                                 onNewSession={this.handleNewSession}
+                                referencedTaskIds={
+                                    this.state.referencedTask
+                                        ? [this.state.referencedTask.task_id]
+                                        : undefined
+                                }
+                                referenceHeader={this.renderReferenceHeader(translate)}
+                            />
+                            <SummaryReferencePicker
+                                visible={this.state.showReferencePicker}
+                                onCancel={() => this.setState({ showReferencePicker: false })}
+                                onSelect={(task) => this.setState({
+                                    referencedTask: task,
+                                    showReferencePicker: false,
+                                })}
+                                selectedTaskId={this.state.referencedTask?.task_id}
                             />
                         </div>
                     ) : (
