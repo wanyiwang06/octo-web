@@ -173,6 +173,8 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
         } catch (err: any) {
             Toast.error(t('summary.common.createFailed'));
             console.error('[AgentChatPanel] Fallback agentChat failed:', err);
+            // Add error bubble so user sees persistent feedback
+            onAssistantMessage?.(t('summary.create.fallbackFailed'), undefined);
         } finally {
             this.setState({ isStreaming: false });
         }

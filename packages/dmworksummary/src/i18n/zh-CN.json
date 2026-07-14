@@ -172,7 +172,17 @@
     "generationTime": "生成用时",
     "stepsCount": "步",
     "streamInterrupted": "过程流中断,已切换到普通模式",
-    "viewGenerationProcess": "查看生成过程"
+    "viewGenerationProcess": "查看生成过程",
+    "error": "错误",
+    "fallbackFailed": "抱歉，连接中断且重试也失败了，请稍后再试",
+    "progress": {
+      "explore": "探索知识库",
+      "fetch": "抓取消息",
+      "filter": "过滤",
+      "map": "映射",
+      "reduce": "归约",
+      "other": "其他"
+    }
   },
   "chatSummary": {
     "panelTitle": "聊天内的智能总结",

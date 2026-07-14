@@ -172,7 +172,17 @@
     "generationTime": "Generation Time",
     "stepsCount": "Steps",
     "streamInterrupted": "Stream interrupted, switched to normal mode",
-    "viewGenerationProcess": "View Generation Process"
+    "viewGenerationProcess": "View Generation Process",
+    "error": "Error",
+    "fallbackFailed": "Sorry, connection interrupted and retry failed. Please try again later.",
+    "progress": {
+      "explore": "Explore Knowledge Base",
+      "fetch": "Fetch Messages",
+      "filter": "Filter",
+      "map": "Map",
+      "reduce": "Reduce",
+      "other": "Other"
+    }
   },
   "chatSummary": {
     "panelTitle": "Summaries in this chat",
