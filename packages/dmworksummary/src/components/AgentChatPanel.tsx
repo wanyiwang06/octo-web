@@ -131,10 +131,9 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
         onUserMessage?.(text);
 
         try {
-            // 引用只在首轮(还没落 assistant 消息前)才传给后端;后续轮次后端会忽略。
-            // 判断"首轮":当前 messages 数组里没有 assistant 消息 = 还没跑过第一轮。
-            const isFirstTurn = !this.props.messages.some(m => m.role === 'assistant');
-            const refIds = isFirstTurn && this.props.referencedTaskIds && this.props.referencedTaskIds.length > 0
+            // 每轮都把引用传给后端(和 CHAT-REFERENCE-BASED-DESIGN-v1 多轮上下文修复对齐)。
+            // 后端每轮重新拼进 system prompt,让 agent 在多轮追问/迭代中始终能看到引用材料。
+            const refIds = this.props.referencedTaskIds && this.props.referencedTaskIds.length > 0
                 ? this.props.referencedTaskIds
                 : undefined;
 
@@ -189,8 +188,8 @@ export default class AgentChatPanel extends Component<AgentChatPanelProps, Agent
         const { t } = this.context;
         const { onAssistantMessage } = this.props;
         try {
-            const isFirstTurn = !this.props.messages.some(m => m.role === 'assistant');
-            const refIds = isFirstTurn && this.props.referencedTaskIds && this.props.referencedTaskIds.length > 0
+            // Fallback 也每轮带引用(和 SSE 主链一致)
+            const refIds = this.props.referencedTaskIds && this.props.referencedTaskIds.length > 0
                 ? this.props.referencedTaskIds
                 : undefined;
 
