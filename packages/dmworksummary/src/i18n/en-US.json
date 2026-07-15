@@ -22,7 +22,15 @@
     "messagesCount": "{{count}} messages",
     "version": "Version {{version}}",
     "current": "Current",
-    "userFallback": "User {{id}}"
+    "userFallback": "User {{id}}",
+    "agentChat": {
+      "viewGenerationProcess": "View generation process",
+      "stepsCount": "steps",
+      "generationTime": "Generation time",
+      "generating": "Generating...",
+      "error": "Error",
+      "streamInterrupted": "Stream interrupted, fell back to normal mode"
+    }
   },
   "action": {
     "accept": "Accept",
@@ -378,15 +386,7 @@
     "leaveConfirm": "Leave this collaboration?",
     "leaveSuccess": "Left",
     "leaveFailed": "Failed to leave",
-    "refineTitle": "Refine Summary",
-    "refineEmptyInput": "Please enter refinement instructions",
-    "refinePlaceholder": "Enter refinement instructions, e.g. \"Expand the risk section into a full paragraph\"",
-    "refineSubmit": "Submit Refinement",
-    "refineSuccess": "Refinement successful, updated to version {{version}}",
-    "refineNotSupported": "This summary does not support refinement",
-    "refineNotCreator": "You are not the creator of this summary and cannot modify it",
-    "refineNoSnapshot": "This summary data version is too old and cannot be refined",
-    "refineFailed": "Refinement failed, please try again later"
+    "continueRefine": "Continue refining"
   },
   "summaryCard": {
     "createdBy": "Created by {{name}}",
@@ -426,5 +426,14 @@
   },
   "splitMessage": {
     "signature": "---\n_by Octo AI Summary_"
+  },
+  "chatReference": {
+    "pickerTitle": "Reference a summary",
+    "searchPlaceholder": "Search summary titles",
+    "empty": "No summaries available to reference",
+    "button": "Reference summary",
+    "buttonTip": "Click to reference an existing summary",
+    "badge": "Referenced",
+    "remove": "Remove reference"
   }
 }
