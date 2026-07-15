@@ -23,6 +23,7 @@ import ScheduleConfigModal from "../components/ScheduleConfigModal";
 import TemplateCard from "../components/TemplateCard";
 import AgentChatPanel from "../components/AgentChatPanel";
 import SummaryReferencePicker from "../components/SummaryReferencePicker";
+import SummaryPreviewModal from "../components/SummaryPreviewModal";
 import { TOPIC_TEMPLATES } from "../constants/templates";
 import { MAX_CHAT_SELECT } from "../constants/limits";
 import type {
@@ -76,6 +77,11 @@ interface SummaryCreatePageState {
     referencedTask: SummaryListItem | null;
     /** 引用选择器 Modal 打开状态 */
     showReferencePicker: boolean;
+    /**
+     * 预览 Modal 当前显示的 task_id。null = 未打开。
+     * 见 CHAT-REFERENCE-PREVIEW-AND-RANGE-SAVE-v1 需求 1。
+     */
+    previewTaskId: number | null;
     error: string | null;
 }
 
@@ -103,6 +109,7 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
         sessionId: '',
         referencedTask: null,
         showReferencePicker: false,
+        previewTaskId: null,
         error: null,
     };
 
@@ -436,7 +443,12 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
 
         if (referencedTask) {
             return (
-                <div className="summary-workbench-ref-card">
+                <div
+                    className="summary-workbench-ref-card"
+                    onClick={() => this.setState({ previewTaskId: referencedTask.task_id })}
+                    style={{ cursor: 'pointer' }}
+                    title={translate('summary.chatReference.previewTitle')}
+                >
                     <span className="summary-workbench-ref-card-label">
                         {translate('summary.chatReference.badge')}
                     </span>
@@ -445,7 +457,11 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
                     </span>
                     <span
                         className="summary-workbench-ref-card-remove"
-                        onClick={() => this.setState({ referencedTask: null })}
+                        onClick={(e) => {
+                            // 阻止事件冒泡触发卡片 onClick (预览 Modal)
+                            e.stopPropagation();
+                            this.setState({ referencedTask: null });
+                        }}
                         title={translate('summary.chatReference.remove')}
                     >
                         ✕
@@ -619,6 +635,10 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
                                     showReferencePicker: false,
                                 })}
                                 selectedTaskId={this.state.referencedTask?.task_id}
+                            />
+                            <SummaryPreviewModal
+                                taskId={this.state.previewTaskId}
+                                onClose={() => this.setState({ previewTaskId: null })}
                             />
                         </div>
                     ) : (
