@@ -22,7 +22,12 @@
     "messagesCount": "{{count}} 条消息",
     "version": "版本 {{version}}",
     "current": "当前",
-    "userFallback": "用户 {{id}}"
+    "userFallback": "用户 {{id}}",
+    "agentChat": {
+      "viewGenerationProcess": "查看生成过程",
+      "stepsCount": "步",
+      "generationTime": "生成用时"
+    }
   },
   "action": {
     "accept": "同意",
