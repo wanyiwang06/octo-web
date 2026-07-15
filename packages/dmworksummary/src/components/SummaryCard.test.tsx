@@ -199,22 +199,22 @@ describe('SummaryCard creator vs participant footer (问题1)', () => {
 });
 
 describe('SummaryCard AI Generated Badge', () => {
-    it('trigger_type === 3 (AGENT) 时显示 AI 徽标', () => {
+    it('trigger_type === 3 (AGENT) 时显示智能助手徽标', () => {
         render(
             <SummaryCard
-                task={makeItem({ title: 'AI 生成总结', trigger_type: 3 }) as any}
+                task={makeItem({ title: '智能助手总结', trigger_type: 3 }) as any}
                 onClick={noop}
                 onDelete={noop}
             />,
         );
 
-        // 检查 AI 徽标 Tag 组件是否存在
+        // 检查智能助手徽标 Tag 组件是否存在
         const aiTag = screen.getByTestId('ai-tag');
         expect(aiTag).toBeInTheDocument();
         expect(aiTag).toHaveTextContent('🤖');
     });
 
-    it('trigger_type === 1 (MANUAL) 时不显示 AI 徽标', () => {
+    it('trigger_type === 1 (MANUAL) 时不显示智能助手徽标', () => {
         render(
             <SummaryCard
                 task={makeItem({ title: '手动总结', trigger_type: 1 }) as any}
@@ -223,11 +223,11 @@ describe('SummaryCard AI Generated Badge', () => {
             />,
         );
 
-        expect(screen.queryByText(/AI 生成/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/智能助手/)).not.toBeInTheDocument();
         expect(screen.queryByText(/🤖/)).not.toBeInTheDocument();
     });
 
-    it('trigger_type === 2 (SCHEDULED) 时不显示 AI 徽标', () => {
+    it('trigger_type === 2 (SCHEDULED) 时不显示智能助手徽标', () => {
         render(
             <SummaryCard
                 task={makeItem({ title: '定时总结', trigger_type: 2 }) as any}
@@ -236,6 +236,6 @@ describe('SummaryCard AI Generated Badge', () => {
             />,
         );
 
-        expect(screen.queryByText(/AI 生成/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/智能助手/)).not.toBeInTheDocument();
     });
 });
