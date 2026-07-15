@@ -505,7 +505,7 @@
     "deleteScheduledContent": "「{{title}}」是定时更新的总结。删除后将停止定时更新，并移除该总结的全部历史记录，确定删除吗？",
     "leaveTitle": "退出多人协作",
     "leaveContent": "退出后将不再参与该多人协作，确定退出「{{title}}」吗？",
-    "aiGenerated": "AI 生成"
+    "aiGenerated": "智能助手"
   },
   "editor": {
     "saveSuccess": "保存成功",

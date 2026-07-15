@@ -505,7 +505,7 @@
     "deleteScheduledContent": "\"{{title}}\" is a scheduled summary. Deleting it will stop the scheduled updates and remove all of its history. Delete it?",
     "leaveTitle": "Leave collaboration",
     "leaveContent": "You will no longer take part in this collaboration. Leave \"{{title}}\"?",
-    "aiGenerated": "AI Generated"
+    "aiGenerated": "Smart assistant"
   },
   "editor": {
     "saveSuccess": "Saved",
