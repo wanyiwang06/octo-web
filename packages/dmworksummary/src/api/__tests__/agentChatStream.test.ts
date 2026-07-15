@@ -35,7 +35,7 @@ describe('agentChatStream', () => {
                 })
                 .mockResolvedValueOnce({
                     done: false,
-                    value: new TextEncoder().encode('data: {"phase":"explore","step":1,"detail":"test"}\n\n'),
+                    value: new TextEncoder().encode('data: {"phase":"understand","step":1,"count":5}\n\n'),
                 })
                 .mockResolvedValueOnce({
                     done: true,
@@ -82,9 +82,9 @@ describe('agentChatStream', () => {
         // The event should be parsed and dispatched
         expect(onProgress).toHaveBeenCalledTimes(1);
         expect(onProgress).toHaveBeenCalledWith({
-            phase: 'explore',
+            phase: 'understand',
             step: 1,
-            detail: 'test',
+            count: 5,
         });
 
         close();
@@ -96,10 +96,10 @@ describe('agentChatStream', () => {
         const onError = vi.fn();
 
         const sseData = `event: progress
-data: {"phase":"explore","step":1,"detail":"searching"}
+data: {"phase":"understand","step":1,"count":3}
 
 event: progress
-data: {"phase":"fetch","step":2,"detail":"fetching data"}
+data: {"phase":"retrieve","step":2,"count":8}
 
 event: done
 data: {"reply":"test result"}
@@ -145,14 +145,14 @@ data: {"reply":"test result"}
 
         expect(onProgress).toHaveBeenCalledTimes(2);
         expect(onProgress).toHaveBeenNthCalledWith(1, {
-            phase: 'explore',
+            phase: 'understand',
             step: 1,
-            detail: 'searching',
+            count: 3,
         });
         expect(onProgress).toHaveBeenNthCalledWith(2, {
-            phase: 'fetch',
+            phase: 'retrieve',
             step: 2,
-            detail: 'fetching data',
+            count: 8,
         });
 
         expect(onDone).toHaveBeenCalledTimes(1);

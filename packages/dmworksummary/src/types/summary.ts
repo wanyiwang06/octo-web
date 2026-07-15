@@ -292,13 +292,16 @@ export interface AgentChatHistory {
  * Agent SSE 流式事件类型 — progress 事件（每步/每工具）
  */
 export interface AgentProgressEvent {
-    phase: 'explore' | 'fetch' | 'filter' | 'map' | 'reduce' | 'other';
-    label: string;
-    detail: string;
+    /**
+     * 抽象阶段枚举（后端脱敏，不再暴露原始工具名）：
+     * understand 理解需求 | retrieve 检索 | filter 筛选 | distill 提炼 | compose 汇总 | reply 生成回复
+     */
+    phase: 'understand' | 'retrieve' | 'filter' | 'distill' | 'compose' | 'reply';
     step: number;
     ofSteps: number;
-    tool: string;
     elapsed_ms: number;
+    /** 安全整型计数（如已处理消息条数）；后端在无意义时省略该字段 */
+    count?: number;
 }
 
 /**
