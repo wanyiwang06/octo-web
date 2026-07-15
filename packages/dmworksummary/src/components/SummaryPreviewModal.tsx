@@ -2,8 +2,8 @@ import React, { Component } from 'react';
 import { Modal, Spin, Empty } from '@douyinfe/semi-ui';
 import { I18nContext } from '@octo/base';
 import SummaryContent from './SummaryContent';
-import { getSummaryDetail } from '../api/summaryApi';
-import type { SummaryDetail } from '../types/summary';
+import { getSummaryDetail, getPersonalResult } from '../api/summaryApi';
+import type { SummaryDetail, PersonalResult } from '../types/summary';
 import './SummaryPreviewModal.css';
 
 /**
@@ -16,6 +16,12 @@ import './SummaryPreviewModal.css';
  * - 复用 SummaryContent 渲染 markdown(不带 citation 交互 — 预览场景够用)
  * - 关闭时父组件负责清空 taskId,避免下次点不同卡片闪一下旧内容
  * - 404/403 → 友好错误"该总结已删除或无权访问"
+ *
+ * 内容源(与 SummaryDetailPage 一致的双源策略):
+ * - 传统 workflow 总结: content 在 summary_result 表 → getSummaryDetail(id).result.content
+ * - Agent 生成总结: content 在 summary_personal_result 表 → getPersonalResult(id).content
+ * - 因此: 先 getSummaryDetail 拿标题/元信息, 若 result.content 为空则 fallback 到
+ *   getPersonalResult(caller 自己的 PR)
  */
 
 interface SummaryPreviewModalProps {
@@ -26,6 +32,8 @@ interface SummaryPreviewModalProps {
 interface SummaryPreviewModalState {
     loading: boolean;
     detail: SummaryDetail | null;
+    // Fallback: 当 detail.result.content 为空(agent 生成的总结) → 从 PersonalResult 拿
+    personalResult: PersonalResult | null;
     error: string | null;
 }
 
@@ -36,6 +44,7 @@ class SummaryPreviewModal extends Component<SummaryPreviewModalProps, SummaryPre
     state: SummaryPreviewModalState = {
         loading: false,
         detail: null,
+        personalResult: null,
         error: null,
     };
 
@@ -46,16 +55,29 @@ class SummaryPreviewModal extends Component<SummaryPreviewModalProps, SummaryPre
         }
         // taskId 从数字 → null = 关闭, 清 state 避免残留
         if (this.props.taskId == null && prev.taskId != null) {
-            this.setState({ detail: null, error: null, loading: false });
+            this.setState({ detail: null, personalResult: null, error: null, loading: false });
         }
     }
 
     private load = async (taskId: number) => {
         const { t } = this.context;
-        this.setState({ loading: true, detail: null, error: null });
+        this.setState({ loading: true, detail: null, personalResult: null, error: null });
         try {
             const detail = await getSummaryDetail(taskId);
-            this.setState({ loading: false, detail });
+            // 若 team result 有内容 → 直接用; 否则 fallback 到 PersonalResult(agent 总结走这里)
+            const teamContent = detail?.result?.content || '';
+            if (teamContent.trim()) {
+                this.setState({ loading: false, detail, personalResult: null });
+                return;
+            }
+            // Fallback: 拉自己那份 PR (agent 生成的总结内容都在这)
+            try {
+                const personal = await getPersonalResult(taskId);
+                this.setState({ loading: false, detail, personalResult: personal });
+            } catch (personalErr: any) {
+                // PR 也拉不到 → 显示 team detail 但内容为空(SummaryContent 会显示 empty state)
+                this.setState({ loading: false, detail, personalResult: null });
+            }
         } catch (e: any) {
             // 后端约定: 404 → not_found, 403 → forbidden
             const httpStatus = e?.response?.status ?? e?.status;
@@ -71,11 +93,14 @@ class SummaryPreviewModal extends Component<SummaryPreviewModalProps, SummaryPre
 
     render() {
         const { taskId, onClose } = this.props;
-        const { loading, detail, error } = this.state;
+        const { loading, detail, personalResult, error } = this.state;
         const { t } = this.context;
 
         const title = detail?.title || (taskId ? t('summary.chatReference.previewTitle') : '');
-        const content = detail?.result?.content || '';
+        // 内容优先: team result → personal result (agent 场景)
+        const content = detail?.result?.content?.trim()
+            ? detail.result.content
+            : (personalResult?.content || '');
 
         return (
             <Modal
