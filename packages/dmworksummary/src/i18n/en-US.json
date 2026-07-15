@@ -26,7 +26,10 @@
     "agentChat": {
       "viewGenerationProcess": "View generation process",
       "stepsCount": "steps",
-      "generationTime": "Generation time"
+      "generationTime": "Generation time",
+      "generating": "Generating...",
+      "error": "Error",
+      "streamInterrupted": "Stream interrupted, fell back to normal mode"
     }
   },
   "action": {

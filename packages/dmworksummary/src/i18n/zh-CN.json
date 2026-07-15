@@ -26,7 +26,10 @@
     "agentChat": {
       "viewGenerationProcess": "查看生成过程",
       "stepsCount": "步",
-      "generationTime": "生成用时"
+      "generationTime": "生成用时",
+      "generating": "生成中…",
+      "error": "出错",
+      "streamInterrupted": "流式连接已断,已切换到普通模式"
     }
   },
   "action": {
