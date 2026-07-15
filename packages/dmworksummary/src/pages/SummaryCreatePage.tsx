@@ -25,6 +25,7 @@ import TemplateCard from "../components/TemplateCard";
 import AgentChatPanel from "../components/AgentChatPanel";
 import SummaryReferencePicker from "../components/SummaryReferencePicker";
 import SummaryPreviewModal from "../components/SummaryPreviewModal";
+import SummaryReferenceSidePanel from "../components/SummaryReferenceSidePanel";
 import { TOPIC_TEMPLATES } from "../constants/templates";
 import { MAX_CHAT_SELECT } from "../constants/limits";
 import type {
@@ -84,8 +85,17 @@ interface SummaryCreatePageState {
     /**
      * 预览 Modal 当前显示的 task_id。null = 未打开。
      * 见 CHAT-REFERENCE-PREVIEW-AND-RANGE-SAVE-v1 需求 1。
+     *
+     * 保留 Modal 状态用于未来其他触发点(比如详情页快照预览)。
+     * 主 UI(chat 里点引用卡片)已改成右侧 SidePanel — 见 sidePanelOpen。
      */
     previewTaskId: number | null;
+    /**
+     * 右侧引用对照面板打开状态(CHAT-REFERENCE-PREVIEW-AND-RANGE-SAVE-v1 需求 1 · Q2 默认收起)
+     * true = 显示 SummaryReferenceSidePanel · false = 不占布局
+     * 点击引用卡片 toggle;移除引用时强制关闭;切引用时 SidePanel 内容跟着变
+     */
+    sidePanelOpen: boolean;
     error: string | null;
     editingTemplate: TopicTemplate | null;
     creatingCustomTemplate: boolean;
@@ -122,6 +132,7 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
         referencedTask: null,
         showReferencePicker: false,
         previewTaskId: null,
+        sidePanelOpen: false,
         error: null,
         editingTemplate: null,
         creatingCustomTemplate: false,
@@ -618,7 +629,7 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
             return (
                 <div
                     className="summary-workbench-ref-card"
-                    onClick={() => this.setState({ previewTaskId: referencedTask.task_id })}
+                    onClick={() => this.setState((prev) => ({ sidePanelOpen: !prev.sidePanelOpen }))}
                     style={{ cursor: 'pointer' }}
                     title={translate('summary.chatReference.previewTitle')}
                 >
@@ -631,9 +642,10 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
                     <span
                         className="summary-workbench-ref-card-remove"
                         onClick={(e) => {
-                            // 阻止事件冒泡触发卡片 onClick (预览 Modal)
+                            // 阻止事件冒泡触发卡片 onClick (toggle SidePanel)
                             e.stopPropagation();
-                            this.setState({ referencedTask: null });
+                            // 移除引用同时强制关闭 SidePanel(引用没了没意义再显示)
+                            this.setState({ referencedTask: null, sidePanelOpen: false });
                         }}
                         title={translate('summary.chatReference.remove')}
                     >
@@ -789,27 +801,46 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
                 <div className="summary-workbench-input-area">
                     {mode === 'agent' ? (
                         // Agent 交互式问答：面板自带输入框，隐藏顶部大 textarea + 4 模板卡片。
-                        <div className="summary-workbench-agent-chat">
-                            <AgentChatPanel
-                                useStream={true}
-                                onUserMessage={this.handleAgentUserMessage}
-                                onAssistantMessage={this.handleAgentAssistantMessage}
-                                sessionId={this.state.sessionId}
-                                profile={this.state.referencedTask ? "summary_refine" : "summary"}
-                                messages={messages}
-                                onSend={this.handleAgentSend}
-                                sending={agentSubmitting}
-                                welcome={translate("summary.create.agentChatWelcome")}
-                                onSaveAsSummary={this.handleSaveAsSummary}
-                                savingSummary={this.state.savingSummary}
-                                onNewSession={this.handleNewSession}
-                                referencedTaskIds={
-                                    this.state.referencedTask
-                                        ? [this.state.referencedTask.task_id]
-                                        : undefined
-                                }
-                                referenceHeader={this.renderReferenceHeader(translate)}
-                            />
+                        // SidePanel 打开时: 加 --with-side class → flex 左右分栏
+                        //   左: main (AgentChatPanel 撑满剩余宽度)
+                        //   右: SummaryReferenceSidePanel (400px 固定)
+                        <div
+                            className={
+                                "summary-workbench-agent-chat" +
+                                (this.state.sidePanelOpen && this.state.referencedTask
+                                    ? " summary-workbench-agent-chat--with-side"
+                                    : "")
+                            }
+                        >
+                            <div className="summary-workbench-agent-chat-main">
+                                <AgentChatPanel
+                                    useStream={true}
+                                    onUserMessage={this.handleAgentUserMessage}
+                                    onAssistantMessage={this.handleAgentAssistantMessage}
+                                    sessionId={this.state.sessionId}
+                                    profile={this.state.referencedTask ? "summary_refine" : "summary"}
+                                    messages={messages}
+                                    onSend={this.handleAgentSend}
+                                    sending={agentSubmitting}
+                                    welcome={translate("summary.create.agentChatWelcome")}
+                                    onSaveAsSummary={this.handleSaveAsSummary}
+                                    savingSummary={this.state.savingSummary}
+                                    onNewSession={this.handleNewSession}
+                                    referencedTaskIds={
+                                        this.state.referencedTask
+                                            ? [this.state.referencedTask.task_id]
+                                            : undefined
+                                    }
+                                    referenceHeader={this.renderReferenceHeader(translate)}
+                                />
+                            </div>
+                            {/* 右侧引用对照面板 (Q1: 400px 固定 · Q2: 默认收起 · Q4: 切引用跟着变) */}
+                            {this.state.sidePanelOpen && this.state.referencedTask && (
+                                <SummaryReferenceSidePanel
+                                    taskId={this.state.referencedTask.task_id}
+                                    onClose={() => this.setState({ sidePanelOpen: false })}
+                                />
+                            )}
                             <SummaryReferencePicker
                                 visible={this.state.showReferencePicker}
                                 onCancel={() => this.setState({ showReferencePicker: false })}
@@ -819,6 +850,7 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
                                 })}
                                 selectedTaskId={this.state.referencedTask?.task_id}
                             />
+                            {/* Modal 保留:未来其他触发点(比如详情页快照预览)可复用;主 UI 已改用 SidePanel */}
                             <SummaryPreviewModal
                                 taskId={this.state.previewTaskId}
                                 onClose={() => this.setState({ previewTaskId: null })}
