@@ -23,7 +23,12 @@
     "messagesCount": "{{count}} messages",
     "version": "Version {{version}}",
     "current": "Current",
-    "userFallback": "User {{id}}"
+    "userFallback": "User {{id}}",
+    "agentChat": {
+      "viewGenerationProcess": "View generation process",
+      "stepsCount": "steps",
+      "generationTime": "Generation time"
+    }
   },
   "action": {
     "accept": "Accept",
