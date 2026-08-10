@@ -543,6 +543,26 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
         return this.state.topic.trim().length > 0;
     }
 
+    /**
+     * SUM-6: Whether the direct (traditional) create path is fully configured.
+     * Direct is disabled when topic is empty OR no chats are selected,
+     * so the user is guided to "先和Agent聊聊" instead.
+     */
+    canDirectCreate(): boolean {
+        return this.state.topic.trim().length > 0
+            && this.state.selectedChats.length > 0;
+    }
+
+    /** SUM-6: Whether a schedule config is set (i.e. this is a scheduled summary). */
+    isScheduledMode(): boolean {
+        return this.state.scheduleConfig !== null;
+    }
+
+    /** SUM-6: Whether multi-person mode is active (members selected). */
+    isMultiPersonMode(): boolean {
+        return this.state.selectedMembers.length > 0;
+    }
+
     handleVoiceTranscribed = (text: string, mode: ReplaceMode, savedRange?: SelectionRange) => {
         if (mode === "all") {
             const topic = this.state.appliedTemplateLabel
@@ -1359,17 +1379,31 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
                             </div>
                         </div>
                         <Button
-                            data-testid={summaryTestIds.createSubmit}
+                            data-testid={`${summaryTestIds.createSubmit} ${summaryTestIds.dualQuickDirect}`}
                             theme="solid"
                             className="summary-workbench-start-btn"
                             loading={submitting}
-                            disabled={!this.canSubmit() || submitting}
+                            disabled={!this.canDirectCreate() || submitting}
                             onClick={this.handlePrimaryClick}
                         >
                             <Sparkles size={16} />
                             {submitting ? translate("summary.create.submitting") : translate("summary.create.start")}
                         </Button>
+                        <Button
+                            data-testid={summaryTestIds.dualQuickAgent}
+                            theme="light"
+                            className="summary-workbench-agent-btn"
+                            disabled={submitting}
+                            onClick={() => this.handleSelectMode('agent')}
+                        >
+                            {translate("summary.create.agentStart")}
+                        </Button>
                     </div>
+                    {!this.canDirectCreate() && mode === 'normal' && (
+                        <div data-testid={summaryTestIds.dualConfigHint} className="summary-workbench-config-hint">
+                            {translate("summary.create.configIncompleteHint")}
+                        </div>
+                    )}
                 </div>
 
                 {error && (

@@ -24,6 +24,17 @@ export const summaryTestIds = {
     createNormalTab: "summary-create-normal-tab",
     createPanelStartBtn: "summary-create-panel-start-btn",
 
+    // ── Dual-entry buttons (SUM-6) ──
+    // Each summary type has a "direct" button and an "agent chat" button.
+    dualQuickDirect: "summary-dual-quick-direct",
+    dualQuickAgent: "summary-dual-quick-agent",
+    dualMultiDirect: "summary-dual-multi-direct",
+    dualMultiAgent: "summary-dual-multi-agent",
+    dualScheduleDirect: "summary-dual-schedule-direct",
+    dualScheduleAgent: "summary-dual-schedule-agent",
+    // Hint shown when direct is disabled but agent is available
+    dualConfigHint: "summary-dual-config-hint",
+
     // ── Chat selector modal ──
     chatSelectorModal: "summary-chat-selector-modal",
     chatSelectorAllGroupsTab: "summary-chat-selector-all-groups-tab",
