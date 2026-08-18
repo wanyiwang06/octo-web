@@ -19,6 +19,7 @@ import * as api from "../api/summaryApi";
 import { getTopicTemplatesConfig, getTopicTemplates } from "../api/summaryApi";
 import { chatTypeToOriginChannelType, getOriginChannelType } from "../utils/channelType";
 import { markAgentSummaryNotificationEligible } from "../utils/groupSummaryNotify";
+import { isPartialFinish, formatGapNotice, FINISH_FAILED_CODE } from "../utils/summaryFinishNotice";
 import { channelToChatCandidate } from "../utils/channelConvert";
 import SummaryDetailPage from "./SummaryDetailPage";
 import ChatSelectorModal from "../components/ChatSelectorModal";
@@ -1003,7 +1004,12 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
             });
             markAgentSummaryNotificationEligible(result.task_id);
 
-            Toast.success(t('summary.create.agentSummaryCreated'));
+            // WEB-02: PARTIAL 仍已保存(照常清 session + 跳详情),但披露覆盖缺口。
+            if (isPartialFinish(result)) {
+                Toast.warning(formatGapNotice(result.gaps, t('summary.create.agentSummaryPartial')));
+            } else {
+                Toast.success(t('summary.create.agentSummaryCreated'));
+            }
 
             // 保存成功 → 销毁 chat session 工作台:
             //   1. 清 localStorage 里的 session_id(不然下次进 agent 会误恢复空 session)
@@ -1047,7 +1053,11 @@ export default class SummaryCreatePage extends Component<SummaryCreatePageProps,
                     Toast.error(t('summary.create.noOutputToSave'));
                     return false;
                 }
-                // 40001: origin_channel_id 反查失败。拆两个子因给不同文案
+                // WEB-02 · 42200: FAILED 完成校验未通过 → 未保存,保留对话让用户继续完善。
+                if (code === FINISH_FAILED_CODE) {
+                    Toast.error(t('summary.create.agentSummaryFailed'));
+                    return false;
+                }
                 // （R4 ms P2-1）：
                 //   (a) referencedTask 还在：前端已把 referenced_task_ids 发过去，
                 //       后端继承兜底也失败 = 被引用总结本身没有 origin（老 agent

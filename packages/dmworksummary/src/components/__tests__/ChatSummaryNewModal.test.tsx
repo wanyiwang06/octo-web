@@ -2,6 +2,7 @@ import React from 'react';
 import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ChatSummaryNewModal from '../ChatSummaryNewModal';
+import { Toast } from '@douyinfe/semi-ui';
 import * as summaryApi from '../../api/summaryApi';
 import { isAgentSummaryNotificationEligible } from '../../utils/groupSummaryNotify';
 
@@ -729,5 +730,48 @@ describe('ChatSummaryNewModal agent save — explicit origin_channel_id (#930)',
             expect.any(Object),
         );
         expect(isAgentSummaryNotificationEligible(1)).toBe(true);
+    });
+
+    it('PARTIAL save → warning toast, still counts as saved (WEB-02)', async () => {
+        vi.mocked(summaryApi.createAgentSummary).mockResolvedValueOnce({
+            task_id: 2, task_no: 'n2', status: 1, created_at: 'x',
+            finish_status: 'PARTIAL', gaps: [{ kind: 'coverage', detail: '频道 X 未覆盖' }],
+        } as any);
+        const ref = React.createRef<ChatSummaryNewModal>();
+        await act(async () => {
+            render(
+                <ChatSummaryNewModal visible channel={{ channelID: 'ch1', channelType: 2 }} onClose={vi.fn()} onSubmit={vi.fn()} ref={ref} />,
+            );
+            await flushPromises();
+        });
+        await act(async () => { (ref.current as any).setState({ sessionId: 'sess-p' }); });
+        let result: boolean | undefined;
+        await act(async () => {
+            result = await (ref.current as any).handleSaveAsSummary('t');
+            await flushPromises();
+        });
+        expect(Toast.warning).toHaveBeenCalled();
+        expect(Toast.success).not.toHaveBeenCalled();
+        expect(result).toBe(true);
+    });
+
+    it('42200 FAILED save → error toast + keeps chat (returns false) (WEB-02)', async () => {
+        const axiosErr = Object.assign(new Error('failed'), { response: { data: { code: 42200 } } });
+        vi.mocked(summaryApi.createAgentSummary).mockRejectedValueOnce(axiosErr);
+        const ref = React.createRef<ChatSummaryNewModal>();
+        await act(async () => {
+            render(
+                <ChatSummaryNewModal visible channel={{ channelID: 'ch1', channelType: 2 }} onClose={vi.fn()} onSubmit={vi.fn()} ref={ref} />,
+            );
+            await flushPromises();
+        });
+        await act(async () => { (ref.current as any).setState({ sessionId: 'sess-f' }); });
+        let result: boolean | undefined;
+        await act(async () => {
+            result = await (ref.current as any).handleSaveAsSummary('t');
+            await flushPromises();
+        });
+        expect(Toast.error).toHaveBeenCalled();
+        expect(result).toBe(false);
     });
 });

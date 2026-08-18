@@ -202,6 +202,8 @@
         "saving": "Saving...",
         "noOutputToSave": "No summary content to save yet. Please chat with AI first to generate content.",
         "agentSummaryCreated": "AI summary saved",
+        "agentSummaryPartial": "AI summary saved (partial — some content may be missing)",
+        "agentSummaryFailed": "The summary didn't pass the completion check and was not saved. Please continue the chat to complete it.",
         "savedReferenceLostRetry": "Save failed: please re-select the referenced summary, or start a new session",
         "savedNoOriginRetry": "Save failed: the referenced summary has no source channel, and this session hasn't read any channel either. Pick a referenced summary with a source, or start a new session and let the AI read a channel first"
     },

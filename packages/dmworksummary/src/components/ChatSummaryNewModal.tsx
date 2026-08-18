@@ -8,6 +8,7 @@ import type { TopicTemplate, ChatCandidate, ScheduleConfig, CreateAgentSummaryPa
 import { SummaryMode } from '../types/summary';
 import { getSourceType, getOriginChannelType, chatTypeToOriginChannelType } from '../utils/channelType';
 import { markAgentSummaryNotificationEligible } from '../utils/groupSummaryNotify';
+import { isPartialFinish, formatGapNotice, FINISH_FAILED_CODE } from '../utils/summaryFinishNotice';
 import { channelToChatCandidate } from '../utils/channelConvert';
 import { resolveTemplate, computeTemplateSelection, getTemplateEditableFields, deriveSummaryTitle, limitTemplateSummaryContent, type ResolvableTemplate } from '../utils/templateResolver';
 
@@ -647,7 +648,12 @@ export default class ChatSummaryNewModal extends Component<
             });
             markAgentSummaryNotificationEligible(res.task_id);
 
-            Toast.success(t('summary.create.agentSummaryCreated'));
+            // WEB-02: PARTIAL 仍已保存,但披露覆盖缺口给用户;COMPLETE 走原成功提示。
+            if (isPartialFinish(res)) {
+                Toast.warning(formatGapNotice(res.gaps, t('summary.create.agentSummaryPartial')));
+            } else {
+                Toast.success(t('summary.create.agentSummaryCreated'));
+            }
 
             // dispatch 刷新事件。下游刷新监听按 taskId 走即可;channelId 传空串以
             // 保持事件字段结构不变、避免 undefined 引用崩溃(origin 已在上面的
@@ -667,6 +673,11 @@ export default class ChatSummaryNewModal extends Component<
                 // 40004: session 无产出
                 if (code === 40004) {
                     Toast.error(t('summary.create.noOutputToSave'));
+                    return false;
+                }
+                // WEB-02 · 42200: FAILED 完成校验未通过 → 未保存,保留对话让用户继续完善。
+                if (code === FINISH_FAILED_CODE) {
+                    Toast.error(t('summary.create.agentSummaryFailed'));
                     return false;
                 }
             }
